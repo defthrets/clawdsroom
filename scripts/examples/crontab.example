@@ -1,0 +1,7 @@
+# Example crontab lines for the homelab. Adjust paths and URLs.
+ROOM_URL=http://localhost:8787
+* * * * *     /opt/clawdsroom/scripts/examples/frigate.sh >/dev/null 2>&1
+*/10 * * * *  IMMICH_URL=http://localhost:2283 IMMICH_KEY=xxxx /opt/clawdsroom/scripts/examples/immich.sh >/dev/null 2>&1
+40 7 * * *    /opt/clawdsroom/scripts/room event cron "name=morning brief"
+30 22 * * *   /opt/clawdsroom/scripts/room event cron "name=nightly diary"
+*/5 * * * *   /opt/clawdsroom/scripts/room event cron "name=watchdog"

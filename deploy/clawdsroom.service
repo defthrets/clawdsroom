@@ -1,0 +1,20 @@
+# systemd unit: copy to /etc/systemd/system/clawdsroom.service, then
+#   systemctl daemon-reload && systemctl enable --now clawdsroom
+[Unit]
+Description=Clawd's Room (wall display server)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/clawdsroom
+ExecStart=/usr/bin/node server/server.js
+Environment=PORT=8787
+Environment=DISK_ROOT=/
+Environment=DISK_MNT=/mnt
+# Environment=CLAWDSROOM_TOKEN=change-me
+Restart=always
+RestartSec=3
+User=clawd
+
+[Install]
+WantedBy=multi-user.target

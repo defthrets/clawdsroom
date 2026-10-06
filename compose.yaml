@@ -1,0 +1,18 @@
+services:
+  clawdsroom:
+    build: .
+    container_name: clawdsroom
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      - COLLECT_SYSTEM=1
+      - DISK_ROOT=/host/root
+      - DISK_MNT=/host/mnt
+      # - CLAWDSROOM_TOKEN=change-me
+    volumes:
+      - ./data:/data
+      - /:/host/root:ro
+      - /mnt:/host/mnt:ro
+      - /proc:/proc:ro
+      - /sys/class/thermal:/sys/class/thermal:ro

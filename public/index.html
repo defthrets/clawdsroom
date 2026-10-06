@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Clawd's Room</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clawd's Room">
+  <meta name="theme-color" content="#0b0d1a">
+  <meta name="description" content="A living pixel-art house for Clawd: a 24/7 wall display that mirrors the homelab.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="stage" class="stage">
+    <canvas id="scene" width="480" height="360" aria-label="Clawd's house"></canvas>
+
+    <header id="topbar" class="topbar">
+      <div class="brand">
+        <span class="dot" id="conn-dot" title="connection"></span>
+        <span class="title">CLAWD'S ROOM</span>
+        <span class="host" id="host">192.168.1.253</span>
+      </div>
+      <div class="now" id="now-doing">Clawd is settling in…</div>
+      <div class="clock" id="clock">--:--</div>
+    </header>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <div id="info" class="info hidden" role="dialog">
+      <div class="info-title" id="info-title"></div>
+      <div class="info-body" id="info-body"></div>
+      <div class="info-stats" id="info-stats"></div>
+    </div>
+
+    <footer id="hud" class="hud">
+      <div class="tiles" id="tiles"></div>
+      <div class="ticker" id="ticker"></div>
+    </footer>
+
+    <div id="hint" class="hint">tap anything in the house to see what it is</div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

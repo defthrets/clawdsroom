@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Tiny CLI for Clawd's Room. Talks to the server with curl.
+#
+#   room state key=value [key=value ...]    patch the state (dotted keys, values auto-typed)
+#   room event <type> [key=value ...]        push an event
+#   room say "text"                          speech bubble (event: say)
+#   room do <activity> ["status"]            set clawd.activity (+ status) and touch last_active
+#   room get [jq-path]                       print the state (pipes through jq if installed)
+#   room events                              print recent events
+#
+# Env: ROOM_URL (default http://localhost:8787), ROOM_TOKEN (if the server has CLAWDSROOM_TOKEN)
+set -euo pipefail
+
+ROOM_URL="${ROOM_URL:-http://localhost:8787}"
+AUTH=()
+if [[ -n "${ROOM_TOKEN:-}" ]]; then AUTH=(-H "Authorization: Bearer ${ROOM_TOKEN}"); fi
+
+usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+
+# Turn key=value pairs into a JSON object. Numbers/booleans/null are kept bare, the rest quoted.
+to_json() {
+  local first=1 kv k v out="{"
+  for kv in "$@"; do
+    k="${kv%%=*}"; v="${kv#*=}"
+    if [[ "$v" =~ ^-?[0-9]+(\.[0-9]+)?$ || "$v" =~ ^(true|false|null)$ || "$v" =~ ^[\[\{] ]]; then
+      :
+    else
+      v=$(printf '%s' "$v" | sed 's/\\/\\\\/g; s/"/\\"/g'); v="\"$v\""
+    fi
+    [[ $first -eq 1 ]] || out+=","
+    out+="\"$k\":$v"; first=0
+  done
+  printf '%s}' "$out"
+}
+
+post() { curl -sS -X POST "${AUTH[@]}" -H 'content-type: application/json' "$ROOM_URL$1" -d "$2"; echo; }
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  state)  [[ $# -gt 0 ]] || usage; post /api/state "$(to_json "$@")" ;;
+  event)  [[ $# -gt 0 ]] || usage; t="$1"; shift; post /api/event "$(to_json "type=$t" "$@")" ;;
+  say)    [[ $# -gt 0 ]] || usage; post /api/event "$(to_json type=say "text=$*")" ;;
+  do)     [[ $# -gt 0 ]] || usage; a="$1"; shift; now=$(( $(date +%s) * 1000 ))
+          if [[ $# -gt 0 ]]; then post /api/state "$(to_json "clawd.activity=$a" "clawd.status=$*" "clawd.last_active=$now")"
+          else post /api/state "$(to_json "clawd.activity=$a" "clawd.last_active=$now")"; fi ;;
+  get)    if command -v jq >/dev/null 2>&1; then curl -sS "$ROOM_URL/api/state" | jq "${1:-.}"; else curl -sS "$ROOM_URL/api/state"; echo; fi ;;
+  events) if command -v jq >/dev/null 2>&1; then curl -sS "$ROOM_URL/api/events" | jq .; else curl -sS "$ROOM_URL/api/events"; echo; fi ;;
+  *)      usage ;;
+esac

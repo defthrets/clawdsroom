@@ -1,0 +1,13 @@
+{
+  "name": "Clawd's Room",
+  "short_name": "Clawd",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b0d1a",
+  "theme_color": "#0b0d1a",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
