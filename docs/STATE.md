@@ -39,6 +39,7 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | `meta.name`, `meta.host` | Title bar. |
 | `clawd.activity` | Where Clawd goes and what he does. One of `idle`, `sleeping`, `terminal`, `watching`, `remote`, `reading`, `tinkering`, `browsing`, `delegating`, `writing`, `speaking`, `looking`, `thinking`. While `idle` he potters: looks out of the window, chills on the couch, pets the dog, checks the post, waters the plant, browses the shelves, has a dance (see `PASTIMES` in `public/js/actors.js`). |
 | `clawd.status` | Short text. Shown in the title bar and in Clawd's speech bubble when it changes. |
+| `clawd.mood` | His face: `happy`, `calm`, `focused`, `excited`, `surprised`, `alert`, `worried`, `sad`, `angry`, `bored`, `sleepy`. The room also works some out itself: worried when the battery is low, the watchdog is unhappy or the CPU is cooking; bored after a long quiet idle; focused at the desk; short flashes of excited/angry/happy on events. The title bar and his tap card say what he is feeling. |
 | `clawd.dream` | Thought bubble while he sleeps. |
 | `clawd.last_active` | ms. With `settings.sleep_after_min`, a stale `idle` becomes `sleeping`. `idle` is also shown as sleeping between 23:00 and 06:30. |
 | `system.cpu`, `system.ram`, `system.temp`, `system.fan`, `system.disk_root`, `system.disk_mnt`, `system.load`, `system.uptime` | HUD tiles, the thermometer, the cupboard LEDs and fan, chimney smoke, the monitor. **Filled automatically** when the server runs on Linux (`COLLECT_SYSTEM=1`, the default). |
@@ -101,7 +102,8 @@ Daily counters (`cams.events_today`, `bus.messages_today`, `chirpa.*_today`) res
 | Photo wall | Immich (`immich`) |
 | Radio on the shelf | RTL-SDR: ADS-B + 433MHz (`sdr`) |
 | Wall clock | Cron (`cron`) |
-| Window to the yard | The cameras' view (`cam` events) |
+| The big plant | Watered at sunrise and sunset (`weather.sunrise` / `weather.sunset`); droops when it has gone without |
+| The TV banner | The cameras' view (`cam` events) |
 | Workbench | Scripts and tinkering (`tinkering`) |
 | The bird in the tree | Chirpa (`bird` events) |
 | The dog under the stairs | clawd-watchdog (`watchdog`, `bark`) |

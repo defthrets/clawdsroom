@@ -2,6 +2,7 @@
 
 import { fmtUptime, fmtDuration, hhmm, clamp } from './util.js';
 import { ITEMS } from './scene.js';
+import { MOOD_EMOJI } from './actors.js';
 
 const ICONS = {
   bird: '🐦', bark: '🐕', telegram: '✉️', bus: '🚌', cam: '📷', photo: '🖼️', plane: '✈️', sensor: '📻', cron: '⏰',
@@ -116,7 +117,8 @@ export class Hud {
     const status = s.clawd.status && act !== 'idle' ? ` — ${s.clawd.status}` : '';
     const next = this.store.nextCron();
     const nextTxt = next ? `  ·  next: ${next.name} in ${fmtDuration(next.mins)}` : '';
-    this.el.now.textContent = `Clawd is ${this.actors.phrase()}${status}${nextTxt}`;
+    const mood = this.actors.mood();
+    this.el.now.textContent = `Clawd is ${this.actors.phrase()}${status} · ${MOOD_EMOJI[mood] || ''} ${mood}${nextTxt}`;
     for (const t of TILES) {
       const tile = this.tiles.get(t.id);
       const [v, unit] = t.v(s);

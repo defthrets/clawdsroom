@@ -15,7 +15,7 @@ export const CLAWD_BODY = {
     '..ppppppppppdd..',
     '..ppppppppppdd..',
     '..ppppppppppdd..',
-    '..ppppddddppdd..',
+    '..ppppppppppdd..',
     '..ppppppppppdd..',
     '..ppppppppppdd..',
     '..dppppppppppd..',
@@ -187,6 +187,20 @@ export const WRENCH = {
   id: 'wrench',
   pal: { s: '#cbd5e1', d: '#64748b' },
   rows: ['ss.ss', 'sssss', '.sss.', '..d..', '..d..', '..d..', '..dd.'],
+};
+
+export const WATERING_CAN = {
+  id: 'can',
+  pal: { s: '#94a3b8', d: '#64748b', l: '#cbd5e1' },
+  rows: [
+    '.....ll.',
+    '....l..l',
+    '..ssssss',
+    'd.slssss',
+    'ddssssss',
+    '..dsssss',
+    '..dddddd',
+  ],
 };
 
 export const HEART = { id: 'heart', pal: { r: '#fb7185' }, rows: ['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'] };

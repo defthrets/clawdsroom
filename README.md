@@ -48,7 +48,16 @@ for what he is doing, for how long, and what he has been up to today.
 When the homelab hasn't given him a job (`clawd.activity` is `idle`) he potters about on his
 own: looks out of the window, chills or naps on the couch, pets the dog, checks the post,
 chats to the bird, waters the plant, browses the shelves, checks the battery, has a little
-dance. He only stands still while he is actually doing something or having a breather.
+dance. He only stands still while he is actually doing something or having a breather. At
+sunrise and sunset he does the rounds with the watering can: the big plant in the living room,
+then the one upstairs. Skip a day and they droop.
+
+**His face shows how he feels.** Set `clawd.mood` from the homelab (`happy`, `calm`, `focused`,
+`excited`, `surprised`, `alert`, `worried`, `sad`, `angry`, `bored`, `sleepy`) and the eyebrows,
+eyes and mouth follow. The room also reads the situation itself: worried when the battery is
+low or the watchdog is unhappy, bored after a long quiet idle, focused at the desk, a flash of
+excitement when you message him, a scowl when the gateway dies. The title bar says what he is
+feeling and a little badge pops over his head when it changes.
 
 ## Wiring it to the homelab
 

@@ -2,7 +2,7 @@
 // Everything is drawn in a 480x360 logical pixel space. Actors (Clawd, dog, bird, bots) live in actors.js.
 
 import { rect, box, outline, hline, vline, disc, px, line, text, textCentered, mix, lerp, clamp, drawSprite, makeCanvas } from './util.js';
-import { BOOK, PLANE, CREW } from './sprites.js';
+import { BOOK, PLANE, CREW, WATERING_CAN } from './sprites.js';
 import { fmtAgo, fmtUptime, fmtDuration } from './util.js';
 
 export const W = 480;
@@ -28,7 +28,8 @@ export const L = {
   tree: { x: 34, canopyY: 240, r: 17 },
   perch: { x: 42, y: 252 },
   dogBed: { x: 262, y: 292, w: 22, h: 8 },
-  window: { x: 80, y: 210, w: 32, h: 30 },
+  bigPlant: { x: 86, y: 300, w: 30 },
+  can: { x: 112, y: 293 },
   radio: { x: 122, y: 206, w: 22, h: 10, shelfY: 216 },
   tv: { x: 118, y: 244, w: 48, h: 36 },
   tvStand: { x: 118, y: 282, w: 48, h: 18 },
@@ -501,21 +502,11 @@ function makeCamNoise() {
 export function drawLivingRoom(ctx, store, t, anim) {
   const s = store.state;
   const day = store.dayFactor();
-  // window to the yard
-  const w = L.window;
-  const { top, bot } = skyColors(day);
-  rect(ctx, w.x, w.y, w.w, w.h, mix(top, bot, 0.6));
-  rect(ctx, w.x, w.y + 20, w.w, 10, day > 0.4 ? '#4f8f3a' : '#23432a'); // yard grass
-  for (let x = w.x + 2; x < w.x + w.w; x += 4) rect(ctx, x, w.y + 16, 1, 5, day > 0.4 ? '#b8a98a' : '#5a5448'); // fence
-  rect(ctx, w.x + 22, w.y + 8, 2, 12, C.woodDk); disc(ctx, w.x + 23, w.y + 7, 4, day > 0.4 ? '#3f8f3a' : '#2b5a2d');
-  if (anim.camFlash > 0) { ctx.globalAlpha = Math.min(0.6, anim.camFlash); rect(ctx, w.x, w.y, w.w, w.h, '#fde68a'); ctx.globalAlpha = 1; }
-  if (anim.camLabel) { rect(ctx, w.x + 1, w.y + 1, w.w - 2, 7, '#7f1d1d'); textCentered(ctx, anim.camLabel.toUpperCase().slice(0, 7), w.x + w.w / 2, w.y + 2, '#fff'); }
-  outline(ctx, w.x - 1, w.y - 1, w.w + 2, w.h + 2, C.white);
-  vline(ctx, w.x + Math.floor(w.w / 2), w.y, w.y + w.h - 1, C.white);
-  hline(ctx, w.x, w.x + w.w - 1, w.y + Math.floor(w.h / 2), C.white);
-  rect(ctx, w.x - 5, w.y - 3, 5, w.h + 6, '#7f1d1d'); rect(ctx, w.x + w.w, w.y - 3, 5, w.h + 6, '#7f1d1d');
-  // a camera in the corner of the window (the Tapos)
-  box(ctx, w.x + w.w + 6, w.y - 6, 6, 4, C.metalLt, C.outline); px(ctx, w.x + w.w + 8, w.y - 5, (Math.floor(t * 2) % 2) ? '#ef4444' : '#7f1d1d');
+  // the big plant (watered at sunrise and sunset)
+  drawBigPlant(ctx, store, t, anim);
+  // the Tapos, up on the wall above the TV
+  box(ctx, L.tv.x + 2, L.tv.y - 10, 6, 4, C.metalLt, C.outline); px(ctx, L.tv.x + 4, L.tv.y - 9, (Math.floor(t * 2) % 2) ? '#ef4444' : '#7f1d1d');
+  box(ctx, L.tv.x + L.tv.w - 8, L.tv.y - 10, 6, 4, C.metalLt, C.outline); px(ctx, L.tv.x + L.tv.w - 6, L.tv.y - 9, (Math.floor(t * 2 + 1) % 2) ? '#ef4444' : '#7f1d1d');
   // radio on a shelf
   const r = L.radio;
   rect(ctx, r.x - 4, r.shelfY, r.w + 8, 2, C.wood); rect(ctx, r.x - 2, r.shelfY + 2, 2, 2, C.woodDk); rect(ctx, r.x + r.w, r.shelfY + 2, 2, 2, C.woodDk);
@@ -552,6 +543,42 @@ export function drawLivingRoom(ctx, store, t, anim) {
   const d = L.dogBed;
   box(ctx, d.x - 2, d.y, d.w + 4, d.h, '#6d28d9', C.outline, '#8b5cf6');
   rect(ctx, d.x, d.y + 2, d.w, 4, '#a78bfa');
+}
+
+// Hours since the last drink decide how perky the leaves are.
+export function plantThirst(store) {
+  const hours = (Date.now() - (store.plants?.lastWatered || Date.now())) / 3600e3;
+  return clamp((hours - 10) / 26, 0, 1); // 0 = fresh, 1 = very thirsty (36h)
+}
+
+export function drawBigPlant(ctx, store, t, anim) {
+  const p = L.bigPlant;
+  const thirst = plantThirst(store);
+  const droop = Math.round(thirst * 4);
+  const g1 = mix('#2f9e44', '#8a9a3a', thirst), g2 = mix('#4ade80', '#b8b85a', thirst), g3 = mix('#15803d', '#6b7a2a', thirst);
+  const cx = p.x + Math.floor(p.w / 2);
+  // pot on a little stand
+  box(ctx, p.x + 5, p.y - 18, p.w - 10, 18, '#b45309', C.outline, '#d97706', '#78350f');
+  rect(ctx, p.x + 3, p.y - 20, p.w - 6, 4, '#c2410c'); outline(ctx, p.x + 3, p.y - 20, p.w - 6, 4, C.outline);
+  rect(ctx, p.x + 7, p.y - 16, p.w - 14, 2, '#3f2a14'); // soil
+  if (anim.plantSparkle > 0 && Math.floor(t * 6) % 2 === 0) { px(ctx, p.x + 4, p.y - 24, '#bbf7d0'); px(ctx, p.x + p.w - 4, p.y - 30, '#bbf7d0'); px(ctx, cx, p.y - 60 + droop, '#ffffff'); }
+  // stems
+  rect(ctx, cx - 1, p.y - 54 + droop, 2, 36 - droop, g3);
+  line(ctx, cx, p.y - 36, cx - 9, p.y - 46 + droop, g3);
+  line(ctx, cx, p.y - 40, cx + 9, p.y - 50 + droop, g3);
+  // leaves: big drooping ovals
+  const leaf = (x, y, w, h, col) => { for (let yy = 0; yy < h; yy++) { const k = yy / (h - 1); const ww = Math.round(w * Math.sin(Math.PI * (0.1 + 0.8 * k))); rect(ctx, x - Math.floor(ww / 2), y + yy, ww, 1, col); } };
+  leaf(cx - 10, p.y - 52 + droop, 10, 7, g1);
+  leaf(cx + 10, p.y - 56 + droop, 10, 7, g1);
+  leaf(cx - 12, p.y - 38 + droop * 2, 12, 8, g2);
+  leaf(cx + 12, p.y - 42 + droop * 2, 12, 8, g2);
+  leaf(cx, p.y - 62 + droop, 9, 7, g2);
+  leaf(cx - 5, p.y - 30 + droop * 2, 10, 6, g1);
+  leaf(cx + 6, p.y - 28 + droop * 2, 10, 6, g1);
+  px(ctx, cx - 10, p.y - 49 + droop, g3); px(ctx, cx + 10, p.y - 53 + droop, g3); px(ctx, cx, p.y - 59 + droop, g3);
+  if (thirst > 0.6 && Math.floor(t) % 4 === 0) textCentered(ctx, 'THIRSTY', cx, p.y - 70, '#fde68a');
+  // the watering can lives next to the pot unless Clawd has it
+  if (!anim.canInHand) drawSprite(ctx, WATERING_CAN, L.can.x, L.can.y, { flip: true });
 }
 
 function drawCrewPhoto(ctx, s) {
@@ -602,6 +629,11 @@ function drawTV(ctx, store, t, anim) {
       if (Math.floor(t * 2) % 2 === 0 && i < online) px(ctx, fx + 19, fy + 12, '#ef4444');
     }
     rect(ctx, sx + 21, sy, 2, sh, '#0b0b10');
+    if (anim.camLabel) {
+      const flash = anim.camFlash > 0 && Math.floor(t * 6) % 2 === 0;
+      rect(ctx, sx, sy + 13, sw, 7, flash ? '#b91c1c' : '#7f1d1d');
+      textCentered(ctx, anim.camText || anim.camLabel.toUpperCase(), sx + sw / 2, sy + 14, '#fff');
+    }
   } else {
     // bus / system dashboard
     rect(ctx, sx, sy, sw, sh, '#0b1020');
@@ -831,9 +863,9 @@ export const ITEMS = [
   { id: 'bird', rect: [L.tree.x - 22, L.tree.canopyY - 22, 50, 64], title: 'Chirpa', body: 'The bird-audio listener. Sings whenever one of the ~79 species is heard in the yard.', stats: (s) => ({ 'species today': s.chirpa.species_today, detections: s.chirpa.detections_today, last: s.chirpa.last ? s.chirpa.last.species : '—' }) },
   { id: 'door', rect: [L.frontDoor.x - 4, L.frontDoor.y - 4, 20, 36], title: 'Front door', body: 'Where the crew bus pulls up and where messages land on the doorstep.', stats: (s) => ({ 'on the bus': (s.bus.online || []).join(', ') || 'nobody', 'messages today': s.bus.messages_today }) },
   { id: 'dog', rect: [L.dogBed.x - 4, L.dogBed.y - 16, 30, 26], title: 'The watchdog', body: 'clawd-watchdog. Loyal, mostly asleep, barks the moment a disk fills, RAM runs out or the gateway dies.', stats: (s) => ({ state: s.watchdog.state, alerts: (s.watchdog.alerts || []).join(', ') || 'none', 'last bark': fmtAgo(s.watchdog.last_bark) }) },
-  { id: 'window', rect: [L.window.x - 6, L.window.y - 8, 48, 44], title: 'Window to the yard', body: "The cameras' view of the actual yard. Flashes when Frigate spots something.", stats: (s) => ({ cams: `${s.cams.online}/${(s.cams.names || []).length} online`, 'events today': s.cams.events_today, last: s.cams.last ? `${s.cams.last.label} @ ${s.cams.last.camera}` : '—' }) },
+  { id: 'plant2', rect: [L.bigPlant.x - 4, L.bigPlant.y - 74, L.bigPlant.w + 16, 76], title: 'The plant', body: 'Watered every sunrise and sunset. It droops when it has gone without a drink, and perks up after one.', stats: (s, store) => ({ 'last watered': fmtAgo(store.plants?.lastWatered), 'next watering': store.nextWatering(), sunrise: s.weather?.sunrise || '06:30', sunset: s.weather?.sunset || '18:30', 'feeling': plantThirst(store) > 0.6 ? 'thirsty' : plantThirst(store) > 0.25 ? 'could do with a drink' : 'fresh' }) },
   { id: 'radio', rect: [L.radio.x - 6, L.radio.y - 12, 34, 30], title: 'Radio', body: 'The RTL-SDR: ADS-B planes overhead and 433MHz sensor chatter.', stats: (s) => ({ planes: s.sdr.planes, sensors: s.sdr.sensors, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign} ${s.sdr.last_plane.alt ? s.sdr.last_plane.alt + 'ft' : ''}` : '—' }) },
-  { id: 'tv', rect: [L.tv.x - 2, L.tv.y - 2, L.tv.w + 4, L.tv.h + 24], title: 'TV', body: 'Live feeds: the Frigate cams (3 Tapos + shed) on one channel, the homelab dashboard on another.', stats: (s) => ({ cams: `${s.cams.online} online`, 'events today': s.cams.events_today }) },
+  { id: 'tv', rect: [L.tv.x - 2, L.tv.y - 12, L.tv.w + 4, L.tv.h + 34], title: 'TV and the cameras', body: 'Live feeds: the Frigate cams (3 Tapos + shed) on one channel, the homelab dashboard on another. Flashes when Frigate spots something.', stats: (s) => ({ cams: `${s.cams.online}/${(s.cams.names || []).length} online`, 'events today': s.cams.events_today, last: s.cams.last ? `${s.cams.last.label} @ ${s.cams.last.camera}` : '—' }) },
   { id: 'crew', rect: [L.crewPhoto.x - 2, L.crewPhoto.y - 2, L.crewPhoto.w + 4, L.crewPhoto.h + 4], title: 'The crew photo', body: 'All of us. Bright when they are online, grey when they are away.', stats: (s) => Object.fromEntries(Object.entries(s.crew || {}).map(([k, v]) => [`${v.emoji || ''} ${k}`, v.online === false ? 'away' : 'home'])) },
   { id: 'couch', rect: [L.couch.x, L.couch.y - 4, L.couch.w, 36], title: 'Couch', body: 'Where I sit to watch the yard.', stats: () => ({}) },
   { id: 'bed', rect: [L.bed.x - 2, L.bed.y - 2, L.bed.w + 4, 40], title: 'Bed', body: 'Idle means asleep means dreaming: memory consolidation and the nightly diary.', stats: (s) => ({ 'last diary': fmtAgo(s.memory.last_diary), consolidated: fmtAgo(s.memory.last_consolidation), dreaming: s.clawd.dream || '—' }) },

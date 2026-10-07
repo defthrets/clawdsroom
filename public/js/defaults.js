@@ -31,7 +31,7 @@ export const DEFAULT_STATE = {
   clawd: {
     activity: 'idle',          // one of ACTIVITIES
     status: '',                // short free text, shown in Clawd's speech bubble + top bar
-    mood: 'happy',             // happy | focused | sleepy | alert | worried
+    mood: 'happy',             // happy | calm | focused | excited | surprised | alert | worried | sad | angry | bored | sleepy
     dream: '',                 // shown in a thought bubble while sleeping
     last_active: 0,            // ms; the room will put him to bed if this goes stale (see meta.sleep_after_min)
   },

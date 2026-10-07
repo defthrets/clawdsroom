@@ -148,6 +148,12 @@ export function startDemo(store) {
     }
   });
 
+  // His mood drifts now and then (the homelab would normally set this).
+  every(47000, () => {
+    if (chance(0.5)) store.patch({ clawd: { mood: pick(['happy', 'happy', 'calm', 'excited', 'bored', 'worried', 'sad', 'angry', 'surprised']) } });
+    else store.patch({ clawd: { mood: 'happy' } });
+  });
+
   // Fire the cron jobs at their real times.
   let lastMin = -1;
   every(5000, () => {

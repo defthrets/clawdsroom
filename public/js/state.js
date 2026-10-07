@@ -16,6 +16,51 @@ export class Store {
     this.historyMax = 720;
     this.historyInterval = 30000;
     this.activityLog = [];    // [{activity, at}] what Clawd has been up to (client-side)
+    this.plants = this.loadPlants();
+  }
+
+  // The plants are the room's own little routine, so their state lives in the browser.
+  loadPlants() {
+    const fresh = { lastWatered: Date.now(), done: {} };
+    try {
+      const raw = localStorage.getItem('clawdsroom.plants');
+      if (raw) { const v = JSON.parse(raw); if (v && typeof v.lastWatered === 'number') return { lastWatered: v.lastWatered, done: v.done || {} }; }
+    } catch { /* private mode etc. */ }
+    return fresh;
+  }
+
+  savePlants() {
+    try { localStorage.setItem('clawdsroom.plants', JSON.stringify(this.plants)); } catch { /* ignore */ }
+  }
+
+  // Which watering is due right now, if any: {key, which: 'sunrise'|'sunset'} within 3h after each.
+  wateringDue(now = new Date()) {
+    const h = this.hourNow(now);
+    const { rise, set } = this.sunTimes();
+    const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    for (const [which, at] of [['sunrise', rise], ['sunset', set]]) {
+      const key = `${day}:${which}`;
+      if (h >= at && h < at + 3 && !this.plants.done[key]) return { key, which };
+    }
+    return null;
+  }
+
+  markWatered(key) {
+    this.plants.lastWatered = Date.now();
+    const done = {};
+    for (const [k, v] of Object.entries(this.plants.done || {}).slice(-6)) done[k] = v;
+    if (key) done[key] = Date.now();
+    this.plants.done = done;
+    this.savePlants();
+  }
+
+  nextWatering(now = new Date()) {
+    const h = this.hourNow(now);
+    const { rise, set } = this.sunTimes();
+    const cands = [rise, set, rise + 24].filter((t) => t > h);
+    const t = Math.min(...cands);
+    const hh = Math.floor(t % 24), mm = Math.round((t % 1) * 60);
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   }
 
   setHistory(list) {
