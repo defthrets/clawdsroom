@@ -8,6 +8,7 @@ Everything the room shows comes from one JSON document, the **state**, plus a st
 * `PUT  /api/state`  → replace the whole state
 * `POST /api/event`  → push an event `{"type": "...", ...}`
 * `GET  /api/events` → the last 60 events
+* `GET  /api/history` → up to 6h of cpu/ram/temp/disk/battery/solar samples (one per 30s), for the trend charts
 * `GET  /api/stream` → Server-Sent Events (`state` and `event` messages). The iPad listens here.
 * `GET  /api/health` → `{ok: true, clients: n}`
 
@@ -36,7 +37,7 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | Key | What the room does with it |
 |---|---|
 | `meta.name`, `meta.host` | Title bar. |
-| `clawd.activity` | Where Clawd goes and what he does. One of `idle`, `sleeping`, `terminal`, `watching`, `remote`, `reading`, `tinkering`, `browsing`, `delegating`, `writing`, `speaking`, `looking`, `thinking`. |
+| `clawd.activity` | Where Clawd goes and what he does. One of `idle`, `sleeping`, `terminal`, `watching`, `remote`, `reading`, `tinkering`, `browsing`, `delegating`, `writing`, `speaking`, `looking`, `thinking`. While `idle` he potters: looks out of the window, chills on the couch, pets the dog, checks the post, waters the plant, browses the shelves, has a dance (see `PASTIMES` in `public/js/actors.js`). |
 | `clawd.status` | Short text. Shown in the title bar and in Clawd's speech bubble when it changes. |
 | `clawd.dream` | Thought bubble while he sleeps. |
 | `clawd.last_active` | ms. With `settings.sleep_after_min`, a stale `idle` becomes `sleeping`. `idle` is also shown as sleeping between 23:00 and 06:30. |

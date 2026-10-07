@@ -42,6 +42,20 @@ export function startDemo(store) {
     crew: { hermes: { online: true }, wormer: { online: true }, opus: { online: false }, jenkins: { online: true }, vinny: { online: false } },
   });
 
+  // Two hours of plausible history so the trend charts have something to show.
+  {
+    const now = Date.now();
+    const h = [];
+    for (let i = 240; i >= 1; i--) {
+      const t = now - i * 30000;
+      const hour = new Date(t).getHours() + new Date(t).getMinutes() / 60;
+      const sun = Math.max(0, Math.sin(Math.PI * (hour - 6.5) / 12));
+      const cpu = clamp(20 + 15 * Math.sin(i / 9) + rand(-6, 6), 3, 95);
+      h.push({ t, cpu: Math.round(cpu), ram: Math.round(44 + 4 * Math.sin(i / 40)), temp: Math.round(40 + cpu * 0.3), disk_root: 61, disk_mnt: 67, battery: Math.round(clamp(76 - i * 0.03 + sun * 10, 8, 100)), solar_w: Math.round(sun * 2600 + rand(-80, 80)), load_w: Math.round(320 + cpu * 4) });
+    }
+    store.setHistory(h);
+  }
+
   // Drift the numbers so the gauges breathe.
   every(2000, () => {
     const s = store.state;
@@ -87,7 +101,7 @@ export function startDemo(store) {
   const changeActivity = () => {
     const h = hourNow();
     const night = h >= 23 || h < 6.5;
-    const a = night ? (chance(0.85) ? 'sleeping' : pick(['writing', 'terminal'])) : pick(activities);
+    const a = night ? (chance(0.85) ? 'sleeping' : pick(['writing', 'terminal'])) : (chance(0.45) ? 'idle' : pick(activities));
     store.patch({ clawd: { activity: a, status: a === 'sleeping' ? 'Zzz' : pick(statuses[a] || ['']), last_active: Date.now() } });
     if (a === 'sleeping' && chance(0.6)) setTimeout(() => store.event({ type: 'dream', text: pick(DREAMS) }), 4000);
     if (a === 'delegating') {
@@ -98,7 +112,7 @@ export function startDemo(store) {
     if (a === 'writing') setTimeout(() => store.event({ type: 'diary', excerpt: 'Quiet day. Fixed the fans.' }), 12000);
   };
   setTimeout(changeActivity, 6000);
-  every(randInt(28, 40) * 1000, changeActivity);
+  every(randInt(45, 70) * 1000, changeActivity);
 
   // Random events.
   every(9000, () => {

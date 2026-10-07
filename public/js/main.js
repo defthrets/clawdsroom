@@ -1,6 +1,6 @@
 // Boot: size the canvas to the screen (integer pixel scale), connect, run the loop, handle taps.
 
-import { W, H, drawSky, drawGround, drawTree, drawMailbox, drawSignpost, drawFrontDoor, drawHouseShell, drawStairs, drawBedroom, drawLibrary, drawLivingRoom, drawOffice, drawGarage, drawLighting, hitTest } from './scene.js';
+import { W, H, drawSky, drawGround, drawTree, drawMailbox, drawSignpost, drawFrontDoor, drawHouseShell, drawStairs, drawBedroom, drawLibrary, drawLivingRoom, drawOffice, drawGarage, drawLighting, drawHighlight, hitTest } from './scene.js';
 import { Store } from './state.js';
 import { connect } from './net.js';
 import { Effects } from './effects.js';
@@ -51,7 +51,7 @@ connect(store, { onMode: (m) => hud.setMode(m), demoForced: forceDemo });
 // ------------------------------------------------------------------ loop
 let last = performance.now();
 let hudT = 0;
-let frameInterval = 1000 / 30;
+const frameInterval = 1000 / 30;
 let acc = 0;
 let running = true;
 
@@ -100,6 +100,8 @@ function draw(t) {
   effects.draw(ctx);
   actors.drawBus(ctx);
   actors.drawLate(ctx);
+  const hl = hud.highlight;
+  if (hl && performance.now() < hl.until) drawHighlight(ctx, hl.item && hl.item.id === 'clawd' ? actors.clawd.rect : hl.rect, t);
 }
 requestAnimationFrame(frame);
 hud.update();
@@ -107,16 +109,21 @@ hud.update();
 // ------------------------------------------------------------------ taps
 function canvasPoint(ev) {
   const r = canvas.getBoundingClientRect();
-  const x = (ev.clientX - r.left) / r.width * W;
-  const y = (ev.clientY - r.top) / r.height * H;
-  return { x, y };
+  return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
+}
+function itemAt(x, y) {
+  return hitTest(x, y, [actors.clawdItem()]);
 }
 canvas.addEventListener('pointerdown', (ev) => {
   const { x, y } = canvasPoint(ev);
-  const item = hitTest(x, y);
-  if (item) hud.showInfo(item); else hud.hideInfo();
+  const item = itemAt(x, y);
+  if (item && !(hud.current && hud.current.id === item.id)) hud.showInfo(item); else hud.hideInfo();
 });
-document.getElementById('info').addEventListener('pointerdown', () => hud.hideInfo());
+canvas.addEventListener('pointermove', (ev) => {
+  if (ev.pointerType && ev.pointerType !== 'mouse') return;
+  const { x, y } = canvasPoint(ev);
+  canvas.classList.toggle('pointer', !!itemAt(x, y));
+});
 
 // ------------------------------------------------------------------ housekeeping
 document.addEventListener('visibilitychange', () => { running = !document.hidden; last = performance.now(); });

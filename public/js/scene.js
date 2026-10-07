@@ -824,15 +824,15 @@ export function drawLighting(ctx, store, t, clawdRoom, botsActive, sleeping) {
 
 // ----------------------------------------------------------------- tap targets
 export const ITEMS = [
-  { id: 'house', rect: [L.roof.eaveX1, L.roof.ridgeY - 2, L.roof.eaveX2 - L.roof.eaveX1, L.roof.eaveY - L.roof.ridgeY + 2], title: 'The house', body: 'The homelab itself, sat in the cupboard. My body.', stats: (s) => ({ host: s.meta.host, uptime: fmtUptime(s.system.uptime), load: s.system.load || '—' }) },
-  { id: 'panels', rect: [L.panels.x - 2, L.panels.y - 10, 100, 20], title: 'Solar panels', body: 'FoxESS. The sun charges the battery in the garage; when it drains to the floor, the lights dim.', stats: (s) => ({ solar: `${s.power.solar_w} W`, load: `${s.power.load_w} W`, grid: `${s.power.grid_w} W` }) },
-  { id: 'chimney', rect: [L.chimney.x - 2, L.chimney.y - 14, 16, 40], title: 'Chimney', body: 'Smoke means the CPU is working hard.', stats: (s) => ({ cpu: `${s.system.cpu}%`, temp: `${s.system.temp}°C` }) },
-  { id: 'mailbox', rect: [0, 258, 24, 44], title: 'Mailbox', body: 'Your Telegram DMs. The flag goes up when something is waiting for me.', stats: (s) => ({ unread: s.telegram.unread, last: s.telegram.last ? `${s.telegram.last.from}: ${s.telegram.last.text}` : '—' }) },
-  { id: 'bird', rect: [L.tree.x - 20, L.tree.canopyY - 20, 44, 40], title: 'Chirpa', body: 'The bird-audio listener. Sings whenever one of the ~79 species is heard in the yard.', stats: (s) => ({ 'species today': s.chirpa.species_today, detections: s.chirpa.detections_today, last: s.chirpa.last ? s.chirpa.last.species : '—' }) },
+  { id: 'house', spark: ['cpu', 'ram'], rect: [L.roof.eaveX1, L.roof.ridgeY - 2, L.roof.eaveX2 - L.roof.eaveX1, L.roof.eaveY - L.roof.ridgeY + 2], title: 'The house', body: 'The homelab itself, sat in the cupboard. My body.', stats: (s) => ({ host: s.meta.host, uptime: fmtUptime(s.system.uptime), load: s.system.load || '—' }) },
+  { id: 'panels', spark: ['solar_w', 'load_w'], rect: [L.panels.x - 2, L.panels.y - 10, 100, 20], title: 'Solar panels', body: 'FoxESS. The sun charges the battery in the garage; when it drains to the floor, the lights dim.', stats: (s) => ({ solar: `${s.power.solar_w} W`, load: `${s.power.load_w} W`, grid: `${s.power.grid_w} W` }) },
+  { id: 'chimney', spark: ['cpu', 'temp'], rect: [L.chimney.x - 2, L.chimney.y - 14, 16, 40], title: 'Chimney', body: 'Smoke means the CPU is working hard.', stats: (s) => ({ cpu: `${s.system.cpu}%`, temp: `${s.system.temp}°C` }) },
+  { id: 'mailbox', rect: [0, 258, 22, 46], title: 'Mailbox', body: 'Your Telegram DMs. The flag goes up when something is waiting for me.', stats: (s) => ({ unread: s.telegram.unread, last: s.telegram.last ? `${s.telegram.last.from}: ${s.telegram.last.text}` : '—' }) },
+  { id: 'bird', rect: [L.tree.x - 22, L.tree.canopyY - 22, 50, 64], title: 'Chirpa', body: 'The bird-audio listener. Sings whenever one of the ~79 species is heard in the yard.', stats: (s) => ({ 'species today': s.chirpa.species_today, detections: s.chirpa.detections_today, last: s.chirpa.last ? s.chirpa.last.species : '—' }) },
   { id: 'door', rect: [L.frontDoor.x - 4, L.frontDoor.y - 4, 20, 36], title: 'Front door', body: 'Where the crew bus pulls up and where messages land on the doorstep.', stats: (s) => ({ 'on the bus': (s.bus.online || []).join(', ') || 'nobody', 'messages today': s.bus.messages_today }) },
   { id: 'dog', rect: [L.dogBed.x - 4, L.dogBed.y - 16, 30, 26], title: 'The watchdog', body: 'clawd-watchdog. Loyal, mostly asleep, barks the moment a disk fills, RAM runs out or the gateway dies.', stats: (s) => ({ state: s.watchdog.state, alerts: (s.watchdog.alerts || []).join(', ') || 'none', 'last bark': fmtAgo(s.watchdog.last_bark) }) },
   { id: 'window', rect: [L.window.x - 6, L.window.y - 8, 48, 44], title: 'Window to the yard', body: "The cameras' view of the actual yard. Flashes when Frigate spots something.", stats: (s) => ({ cams: `${s.cams.online}/${(s.cams.names || []).length} online`, 'events today': s.cams.events_today, last: s.cams.last ? `${s.cams.last.label} @ ${s.cams.last.camera}` : '—' }) },
-  { id: 'radio', rect: [L.radio.x - 4, L.radio.y - 10, 30, 24], title: 'Radio', body: 'The RTL-SDR: ADS-B planes overhead and 433MHz sensor chatter.', stats: (s) => ({ planes: s.sdr.planes, sensors: s.sdr.sensors, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign} ${s.sdr.last_plane.alt ? s.sdr.last_plane.alt + 'ft' : ''}` : '—' }) },
+  { id: 'radio', rect: [L.radio.x - 6, L.radio.y - 12, 34, 30], title: 'Radio', body: 'The RTL-SDR: ADS-B planes overhead and 433MHz sensor chatter.', stats: (s) => ({ planes: s.sdr.planes, sensors: s.sdr.sensors, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign} ${s.sdr.last_plane.alt ? s.sdr.last_plane.alt + 'ft' : ''}` : '—' }) },
   { id: 'tv', rect: [L.tv.x - 2, L.tv.y - 2, L.tv.w + 4, L.tv.h + 24], title: 'TV', body: 'Live feeds: the Frigate cams (3 Tapos + shed) on one channel, the homelab dashboard on another.', stats: (s) => ({ cams: `${s.cams.online} online`, 'events today': s.cams.events_today }) },
   { id: 'crew', rect: [L.crewPhoto.x - 2, L.crewPhoto.y - 2, L.crewPhoto.w + 4, L.crewPhoto.h + 4], title: 'The crew photo', body: 'All of us. Bright when they are online, grey when they are away.', stats: (s) => Object.fromEntries(Object.entries(s.crew || {}).map(([k, v]) => [`${v.emoji || ''} ${k}`, v.online === false ? 'away' : 'home'])) },
   { id: 'couch', rect: [L.couch.x, L.couch.y - 4, L.couch.w, 36], title: 'Couch', body: 'Where I sit to watch the yard.', stats: () => ({}) },
@@ -842,21 +842,29 @@ export const ITEMS = [
   { id: 'photos', rect: [L.photoWall.x - 2, L.photoWall.y - 2, 50, 36], title: 'Photo wall', body: 'Immich. My photo memories.', stats: (s) => ({ photos: s.immich.photos, 'last upload': fmtAgo(s.immich.last_upload) }) },
   { id: 'books', rect: [L.bookshelf.x - 2, L.bookshelf.y - 10, L.bookshelf.w + 4, L.bookshelf.h + 10], title: 'Bookshelves', body: 'My memory. Everything I have learned, filed on shelves.', stats: (s) => ({ notes: s.memory.notes, consolidated: fmtAgo(s.memory.last_consolidation) }) },
   { id: 'cabinet', rect: [L.cabinet.x - 2, L.cabinet.y - 10, L.cabinet.w + 4, L.cabinet.h + 10], title: 'Filing cabinet', body: 'My skills, one per drawer.', stats: (s) => ({ skills: s.memory.skills }) },
-  { id: 'thermo', rect: [L.thermo.x - 6, L.thermo.y - 10, 16, 44], title: 'Thermometer', body: 'CPU temperature. The fan in the cupboard spins faster as it climbs (fan-adjust.sh).', stats: (s) => ({ temp: `${s.system.temp}°C`, fan: `${s.system.fan}%` }) },
-  { id: 'desk', rect: [L.chair.x - 2, L.monitor.y - 2, 60, 60], title: 'Computer desk', body: 'The terminal: my hands. Where I run commands, fix fan scripts and restart Frigate.', stats: (s) => ({ cpu: `${s.system.cpu}%`, ram: `${s.system.ram}%`, 'disk /': `${s.system.disk_root}%` }) },
+  { id: 'thermo', spark: ['temp'], rect: [L.thermo.x - 6, L.thermo.y - 10, 16, 44], title: 'Thermometer', body: 'CPU temperature. The fan in the cupboard spins faster as it climbs (fan-adjust.sh).', stats: (s) => ({ temp: `${s.system.temp}°C`, fan: `${s.system.fan}%` }) },
+  { id: 'desk', spark: ['cpu', 'ram'], rect: [L.chair.x - 2, L.monitor.y - 2, 60, 60], title: 'Computer desk', body: 'The terminal: my hands. Where I run commands, fix fan scripts and restart Frigate.', stats: (s) => ({ cpu: `${s.system.cpu}%`, ram: `${s.system.ram}%`, 'disk /': `${s.system.disk_root}%` }) },
   { id: 'laptop', rect: [L.laptop.x - 2, L.laptop.y - 8, L.laptop.w + 6, 18], title: 'Laptop', body: 'My remote reach: SSH to defthrets, Wormer and Vinny, and the link to you on Telegram.', stats: (s) => ({ wan: s.network.wan ? 'up' : 'down', latency: `${s.network.latency_ms} ms` }) },
-  { id: 'cupboard', rect: [L.cupboard.x - 2, L.speaker.y - 2, L.cupboard.w + 4, L.cupboard.h + 14], title: 'The cupboard', body: 'The homelab rack and the speaker (my voice, TTS) on top. LEDs blink with CPU, the fan spins with temperature.', stats: (s) => ({ cpu: `${s.system.cpu}%`, ram: `${s.system.ram}%`, temp: `${s.system.temp}°C`, fan: `${s.system.fan}%` }) },
-  { id: 'shelf', rect: [L.garageShelf.x - 2, L.garageShelf.y - 8, L.garageShelf.w + 4, L.garageShelf.h + 8], title: 'Garage shelves', body: '/mnt (915GB): movies and downloads, plus RetroShelf with ~4900 games.', stats: (s) => ({ used: `${s.storage.mnt_used_gb} / ${s.storage.mnt_total_gb} GB`, games: s.storage.games, movies: s.storage.movies }) },
-  { id: 'battery', rect: [L.battery.x - 4, L.battery.y - 12, L.battery.w + 8, L.battery.h + 20], title: 'Battery', body: 'FoxESS battery. Below the low mark the lights dim: the "ESS overload" moment.', stats: (s) => ({ battery: `${s.power.battery}%`, charging: s.power.charging ? 'yes' : 'no', solar: `${s.power.solar_w} W` }) },
+  { id: 'cupboard', spark: ['cpu', 'temp'], rect: [L.cupboard.x - 2, L.speaker.y - 2, L.cupboard.w + 4, L.cupboard.h + 14], title: 'The cupboard', body: 'The homelab rack and the speaker (my voice, TTS) on top. LEDs blink with CPU, the fan spins with temperature.', stats: (s) => ({ cpu: `${s.system.cpu}%`, ram: `${s.system.ram}%`, temp: `${s.system.temp}°C`, fan: `${s.system.fan}%` }) },
+  { id: 'shelf', spark: ['disk_mnt'], rect: [L.garageShelf.x - 2, L.garageShelf.y - 8, L.garageShelf.w + 4, L.garageShelf.h + 8], title: 'Garage shelves', body: '/mnt (915GB): movies and downloads, plus RetroShelf with ~4900 games.', stats: (s) => ({ used: `${s.storage.mnt_used_gb} / ${s.storage.mnt_total_gb} GB`, games: s.storage.games, movies: s.storage.movies }) },
+  { id: 'battery', spark: ['battery', 'solar_w'], rect: [L.battery.x - 4, L.battery.y - 12, L.battery.w + 8, L.battery.h + 20], title: 'Battery', body: 'FoxESS battery. Below the low mark the lights dim: the "ESS overload" moment.', stats: (s) => ({ battery: `${s.power.battery}%`, charging: s.power.charging ? 'yes' : 'no', solar: `${s.power.solar_w} W` }) },
   { id: 'bench', rect: [L.pegboard.x - 2, L.pegboard.y - 2, L.pegboard.w + 4, 58], title: 'Workbench', body: 'Scripts and tinkering. Where I bash fan-adjust.sh into shape.', stats: (s) => ({ fan: `${s.system.fan}%` }) },
   { id: 'bots', rect: [L.botDock.x - 4, L.feet.lower - 26, 34, 28], title: 'Helper bots', body: 'Subagents. When I delegate a job, a helper trundles out of the garage.', stats: (s) => ({ active: s.subagents.active, names: (s.subagents.names || []).join(', ') || '—' }) },
   { id: 'www', rect: [L.signpost.x - 10, 256, 24, 48], title: 'The road out', body: 'The internet: web search and the browser. How I wander outside.', stats: (s) => ({ wan: s.network.wan ? 'up' : 'down', latency: `${s.network.latency_ms} ms`, devices: s.network.devices }) },
 ];
 
-export function hitTest(x, y) {
+export function drawHighlight(ctx, rect, t) {
+  if (!rect) return;
+  const [x, y, w, h] = rect;
+  const on = Math.floor(t * 4) % 2 === 0;
+  outline(ctx, x - 1, y - 1, w + 2, h + 2, on ? '#fde047' : '#ffffff');
+  px(ctx, x - 1, y - 1, '#fde047'); px(ctx, x + w, y - 1, '#fde047'); px(ctx, x - 1, y + h, '#fde047'); px(ctx, x + w, y + h, '#fde047');
+}
+
+export function hitTest(x, y, extra = []) {
   // smallest matching rect wins
   let best = null;
-  for (const it of ITEMS) {
+  for (const it of [...extra, ...ITEMS]) {
     const [rx, ry, rw, rh] = it.rect;
     if (x >= rx && x < rx + rw && y >= ry && y < ry + rh) {
       const area = rw * rh;

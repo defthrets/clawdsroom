@@ -3,7 +3,7 @@
 
 import { L, SPOTS, stairY, roomAt } from './scene.js';
 import { CLAWD_BODY, CLAWD_WALK_A, CLAWD_WALK_B, CLAWD_SIT, CLAW, DOG_STAND, DOG_SIT, DOG_SLEEP, DOG_BARK, BIRD, BIRD_SING, BOT, BOT_WALK, BOOK, ENVELOPE, EYE_ICON, CREW } from './sprites.js';
-import { drawSprite, rect, px, disc, text, textCentered, bubble, rand, randInt, pick, chance, clamp, lerp, box, outline } from './util.js';
+import { drawSprite, rect, px, disc, text, textCentered, bubble, rand, randInt, pick, chance, clamp, lerp, box, outline, fmtDuration } from './util.js';
 
 const WALK_SPEED = 34;
 const TERM_LINES = ['$ ssh wormer', '$ df -h /mnt', '$ htop', '$ ./fan-adjust.sh', '$ docker ps', '$ tail -f gw.log', '$ git pull', '$ systemctl restart frigate', '$ journalctl -f', '$ ping 1.1.1.1', '$ uptime', '$ cat memory.md', 'ok', 'done.', 'restarting', 'nice.'];
@@ -24,7 +24,43 @@ export const PHRASES = {
   thinking: 'thinking',
 };
 
+// Little things Clawd does on his own when the homelab hasn't given him a job.
+//   x/floor: where to go (omit for "right here"); face: which way to look; sit: couch|chair|bed
+//   act: the mini-animation while there; dur: seconds there; when: times of day it is likelier
+//   lines: things he might say on arrival ('NEXT' = the next cron job, 'MAIL' = the mailbox state)
+export const PASTIMES = [
+  { id: 'window', phrase: 'looking out the window', x: 104, floor: 'lower', face: -1, act: 'lookup', dur: [6, 14], when: ['morning', 'day'], lines: ['Nice out.', 'Quiet yard.', 'Was that the cat?', 'Bins are out.'] },
+  { id: 'couch', phrase: 'chilling on the couch', x: 190, floor: 'lower', face: -1, sit: 'couch', dur: [18, 45], when: ['day', 'evening'], lines: ['Telly time.', 'Just chilling.', 'Feet up.'] },
+  { id: 'nap', phrase: 'napping on the couch', x: 194, floor: 'lower', face: -1, sit: 'couch', act: 'nap', dur: [25, 60], when: ['day', 'evening'], lines: ['Five minutes.'] },
+  { id: 'dog', phrase: 'petting the dog', x: 252, floor: 'lower', face: 1, act: 'pet', dur: [5, 10], when: ['morning', 'day', 'evening'], lines: ['Good dog.', "Who's a good watchdog?", 'Anything to report?'] },
+  { id: 'crew', phrase: 'looking at the crew photo', x: 168, floor: 'lower', face: 1, act: 'lookup', dur: [4, 8], when: ['evening'], lines: ['Good crew, that.', 'Miss you lot.', 'Look at us.'] },
+  { id: 'radio', phrase: 'listening to the radio', x: 108, floor: 'lower', face: 1, act: 'radio', dur: [6, 12], when: ['morning', 'evening'], lines: ['...static...', 'Planes up tonight.', 'Shed sensor again.'] },
+  { id: 'cupboard', phrase: 'checking the cupboard', x: 358, floor: 'lower', face: 1, act: 'check', dur: [5, 10], when: ['day'], lines: ['Fans sound fine.', "That's my body, that.", 'Warm in there.'] },
+  { id: 'peek', phrase: 'peeking at the stats', x: 300, floor: 'lower', face: 1, sit: 'chair', dur: [6, 12], when: ['morning', 'day'], lines: ['All quiet.', 'Load is fine.'] },
+  { id: 'garage', phrase: 'checking the battery', x: 408, floor: 'lower', face: -1, act: 'lookup', dur: [5, 10], when: ['morning', 'evening'], lines: ['Battery looks alright.', 'Plenty of room on /mnt.', 'Panels are earning.'] },
+  { id: 'plant', phrase: 'watering the plant', x: 356, floor: 'upper', face: 1, act: 'water', dur: [4, 8], when: ['morning', 'day'], lines: ['Drink up.', 'Growing nicely.'] },
+  { id: 'photos', phrase: 'looking at the photo wall', x: 264, floor: 'upper', face: 1, act: 'lookup', dur: [5, 12], when: ['day', 'evening'], lines: ['Good times.', 'Remember that?', 'Nice one of you.'] },
+  { id: 'books', phrase: 'browsing the bookshelf', x: 282, floor: 'upper', face: 1, act: 'browse', dur: [6, 12], when: ['day', 'evening'], lines: ['Where did I put that...', 'Ah, there it is.'] },
+  { id: 'bedwindow', phrase: 'stargazing', x: 200, floor: 'upper', face: 1, act: 'lookup', dur: [6, 12], when: ['evening', 'night'], lines: ['Stars are out.', 'Clear night.', 'Is that a plane?'], dark: true },
+  { id: 'clock', phrase: 'checking the clock', x: 206, floor: 'upper', face: 1, act: 'lookup', dur: [3, 6], when: ['morning', 'day', 'evening'], lines: ['NEXT'] },
+  { id: 'bedsit', phrase: 'sitting on the bed', x: 126, floor: 'upper', face: 1, sit: 'bed', dur: [8, 20], when: ['morning', 'night'], lines: ['Five more minutes.', 'Made the bed.'] },
+  { id: 'mailbox', phrase: 'checking the post', x: 26, floor: 'outside', face: -1, act: 'mail', dur: [4, 8], when: ['morning', 'day'], lines: ['MAIL'] },
+  { id: 'tree', phrase: 'chatting to Chirpa', x: 54, floor: 'outside', face: -1, act: 'lookup', dur: [5, 12], when: ['morning', 'day'], lines: ['Alright, Chirpa?', 'Sing us one.', 'Any good ones today?'] },
+  { id: 'door', phrase: 'answering the door', x: 94, floor: 'lower', face: -1, act: 'check', dur: [5, 9], when: [], lines: [], forcedOnly: true },
+  { id: 'dance', phrase: 'having a little dance', act: 'dance', dur: [4, 7], when: ['day', 'evening'], lines: ['Tune!', '♪ ♪'] },
+  { id: 'stretch', phrase: 'stretching', act: 'stretch', dur: [2, 4], when: ['morning', 'day', 'evening', 'night'], lines: [] },
+  { id: 'wander', phrase: 'pottering about', dur: [2, 5], when: ['morning', 'day', 'evening', 'night'], wander: true },
+];
+const PASTIME_BY_ID = Object.fromEntries(PASTIMES.map((p) => [p.id, p]));
+
 function feetY(floor) { return L.feet[floor] ?? L.feet.lower; }
+
+function dayBucket(h) {
+  if (h >= 6 && h < 10) return 'morning';
+  if (h >= 10 && h < 17) return 'day';
+  if (h >= 17 && h < 22) return 'evening';
+  return 'night';
+}
 
 function planPath(from, to) {
   const pts = [];
@@ -58,9 +94,11 @@ export class Actors {
       bookOut: 0, journalGlow: 0, lampOn: false, solarPulse: 0, speaking: 0, tinkering: false, radioPing: 0,
     };
     this.clawd = {
-      x: SPOTS.idle.x, floor: 'lower', y: feetY('lower'), face: 1, path: [], moving: false, pose: 'stand',
-      activity: null, arrived: true, walkT: 0, blink: 0, nextBlink: 3, wanderT: 6, eyesWide: 0, bubble: null, thought: null,
+      x: SPOTS.idle.x, floor: 'lower', y: feetY('lower'), face: 1, path: [], moving: false, pose: 'stand', dest: null,
+      activity: null, arrived: true, walkT: 0, blink: 0, nextBlink: 3, eyesWide: 0, bubble: null, thought: null,
       lastStatus: '', termT: 0, actionT: 0, happy: 0, alert: 0,
+      pastime: null, recent: [], pauseT: 2, fidgetT: 25, stretch: 0, dance: 0, glance: 0, lookUp: 0, napping: false, petting: false, watering: false,
+      rect: [0, 0, 0, 0],
     };
     this.dog = { state: 'sleep', barkT: 0, alertT: 0, zT: 3, frame: 0 };
     this.bird = { singT: 0, hopT: 0, noteT: 0, nextHop: rand(3, 8), face: 1 };
@@ -82,11 +120,28 @@ export class Actors {
   // ------------------------------------------------------------ events
   onEvent(ev) {
     const c = this.clawd;
+    const idle = this.store.effectiveActivity() === 'idle';
     switch (ev.type) {
-      case 'bird': this.bird.singT = 4.5; this.fx.label(L.perch.x + 2, L.perch.y - 22, String(ev.species || 'bird').toUpperCase(), { life: 6, rise: 3, bg: '#1e3a8a' }); break;
-      case 'bark': this.dog.state = 'bark'; this.dog.barkT = 6; this.dog.reason = ev.reason || ''; if (c.pose === 'bed') c.alert = 3; break;
-      case 'telegram': this.envelopes.push({ t: 0, from: ev.from || 'you' }); this.dog.alertT = 5; this.say(`DM FROM ${String(ev.from || 'you').toUpperCase()}`, 6); if ((ev.from || 'you') === 'you') c.happy = 2.5; break;
-      case 'bus': this.spawnBus(ev); break;
+      case 'bird':
+        this.bird.singT = 4.5;
+        this.fx.label(L.perch.x + 2, L.perch.y - 22, String(ev.species || 'bird').toUpperCase(), { life: 6, rise: 3, bg: '#1e3a8a' });
+        if (idle && c.floor === 'outside') c.lookUp = 4;
+        break;
+      case 'bark':
+        this.dog.state = 'bark'; this.dog.barkT = 6; this.dog.reason = ev.reason || '';
+        if (c.pose === 'bed') c.alert = 3;
+        if (idle) this.forcePastime('dog', 'What is it, boy?');
+        break;
+      case 'telegram':
+        this.envelopes.push({ t: 0, from: ev.from || 'you' }); this.dog.alertT = 5;
+        this.say(`DM FROM ${String(ev.from || 'you').toUpperCase()}`, 6);
+        if ((ev.from || 'you') === 'you') c.happy = 2.5;
+        if (idle) this.forcePastime('mailbox');
+        break;
+      case 'bus':
+        this.spawnBus(ev);
+        if (idle) this.forcePastime('door', `Alright, ${String(ev.from || 'mate')}?`);
+        break;
       case 'cam': {
         this.anim.camFlash = 1.5; this.anim.camLabel = String(ev.label || 'motion'); this.anim.camT = 6;
         const names = this.store.state.cams.names || [];
@@ -94,10 +149,11 @@ export class Actors {
         this.anim.tvForce = 8; this.anim.tvMode = 'cams';
         c.eyesWide = 2.5;
         this.say(`${String(ev.label || 'motion').toUpperCase()} AT ${String(ev.camera || 'cam').toUpperCase()}`, 5);
+        if (idle) this.forcePastime('window', null);
         break;
       }
-      case 'photo': this.anim.photoFlash = 1.4; this.anim.photoFlashIndex = randInt(0, 5); this.anim.photoSeed += 1; break;
-      case 'plane': this.planes.push({ x: 492, y: randInt(18, 42), dir: -1, label: ev.callsign ? String(ev.callsign).toUpperCase() : '', speed: rand(18, 26) }); break;
+      case 'photo': this.anim.photoFlash = 1.4; this.anim.photoFlashIndex = randInt(0, 5); this.anim.photoSeed += 1; if (idle && chance(0.5)) this.forcePastime('photos', 'New one!'); break;
+      case 'plane': this.planes.push({ x: 492, y: randInt(18, 42), dir: -1, label: ev.callsign ? String(ev.callsign).toUpperCase() : '', speed: rand(18, 26) }); if (idle && c.floor === 'outside') c.lookUp = 5; break;
       case 'sensor': this.anim.radioPing = 3; this.fx.label(L.radio.x + 11, L.radio.y - 20, (ev.name ? String(ev.name) : '433MHZ').toUpperCase().slice(0, 12), { life: 4, rise: 2, bg: '#14532d' }); break;
       case 'cron': this.anim.clockShake = 2; this.fx.label(L.clock.cx, L.clock.cy - 20, String(ev.name || 'cron').toUpperCase(), { life: 5, rise: 2, bg: '#7f1d1d' }); break;
       case 'subagent': if (ev.action === 'done') this.bots.walkers.push({ x: 500, dir: -1, dock: this.bots.walkers.length % 3, t: 0 }); else this.bots.walkers.push({ x: L.botDock.x + 10, dir: 1, t: 0 }); break;
@@ -105,7 +161,7 @@ export class Actors {
       case 'look': c.eyesWide = 3; this.anim.eyeIcon = 2.5; break;
       case 'dream': c.thought = { text: String(ev.text || ''), t: 12 }; break;
       case 'diary': this.anim.journalGlow = 5; this.fx.spark(L.nightstand.x + 6, L.nightstand.y - 6); this.say('DIARY DONE', 4); break;
-      case 'solar': this.anim.solarPulse = 3; this.fx.label(L.battery.x + 9, L.battery.y - 20, String(ev.note || 'ESS').toUpperCase().slice(0, 12), { life: 4, rise: 2, bg: '#78350f' }); break;
+      case 'solar': this.anim.solarPulse = 3; this.fx.label(L.battery.x + 9, L.battery.y - 20, String(ev.note || 'ESS').toUpperCase().slice(0, 12), { life: 4, rise: 2, bg: '#78350f' }); if (idle) this.forcePastime('garage', null); break;
       case 'note': if (ev.text) this.say(String(ev.text), 6); break;
       default: break;
     }
@@ -151,7 +207,6 @@ export class Actors {
     for (const k of ['camFlash', 'camT', 'clockShake', 'photoFlash', 'bookOut', 'journalGlow', 'solarPulse', 'speaking', 'radioPing', 'tvForce', 'eyeIcon']) if (a[k] > 0) a[k] = Math.max(0, a[k] - dt);
     if (a.camT <= 0) { a.camLabel = ''; a.camHit = -1; }
     if (a.speaking > 0 && Math.floor(this.t * 4) !== Math.floor((this.t - dt) * 4)) this.fx.wave(L.speaker.x + 11, L.speaker.y + 5, '#a5f3fc', 1);
-    // chimney smoke scales with CPU
     const cpu = Number(s.system.cpu || 0);
     this.smokeT -= dt;
     if (cpu > 15 && this.smokeT <= 0) { this.fx.smoke(L.chimney.x + 6, L.chimney.y - 2, 0.6 + cpu / 100); this.smokeT = 2.2 - cpu / 70; }
@@ -161,7 +216,8 @@ export class Actors {
     const c = this.clawd;
     const act = this.store.effectiveActivity();
     if (act !== c.activity) this.setActivity(act, s);
-    // movement
+
+    // movement along the planned path
     if (c.path.length) {
       const wp = c.path[0];
       const dx = wp.x - c.x;
@@ -173,37 +229,29 @@ export class Actors {
         c.face = Math.sign(dx) || c.face;
         if (wp.stairs) c.y = stairY(c.x);
         else if (wp.floor !== c.floor) {
-          // short step between inside (300) and outside (304)
           const from = feetY(c.floor), to = feetY(wp.floor);
-          const k = clamp(1 - Math.abs(dx) / 8, 0, 1);
-          c.y = lerp(from, to, k);
+          c.y = lerp(from, to, clamp(1 - Math.abs(dx) / 8, 0, 1));
         } else c.y = feetY(c.floor);
       }
       c.moving = true;
       c.walkT += dt;
-      if (!c.path.length) { c.moving = false; c.arrived = true; this.onArrive(act); }
+      if (!c.path.length) { c.moving = false; c.arrived = true; this.onArrive(); }
     } else c.moving = false;
 
-    // blink
+    // timers
     c.nextBlink -= dt;
     if (c.nextBlink <= 0) { c.blink = 0.14; c.nextBlink = rand(2.5, 6); }
-    if (c.blink > 0) c.blink -= dt;
-    if (c.eyesWide > 0) c.eyesWide -= dt;
-    if (c.happy > 0) c.happy -= dt;
-    if (c.alert > 0) c.alert -= dt;
+    for (const k of ['blink', 'eyesWide', 'happy', 'alert', 'stretch', 'dance', 'glance', 'lookUp']) if (c[k] > 0) c[k] = Math.max(0, c[k] - dt);
     if (c.bubble) { c.bubble.t -= dt; if (c.bubble.t <= 0) c.bubble = null; }
     if (c.thought) { c.thought.t -= dt; if (c.thought.t <= 0) c.thought = null; }
+    c.napping = false; c.petting = false; c.watering = false;
 
-    // activity behaviours while arrived
     const a = this.anim;
     a.typing = false; a.tinkering = false;
     if (c.arrived && !c.moving) {
       c.actionT += dt;
       switch (act) {
-        case 'idle':
-          c.wanderT -= dt;
-          if (c.wanderT <= 0) { c.wanderT = rand(5, 11); const [x1, x2] = SPOTS.idle.wander; this.walkTo(randInt(x1, x2), 'lower'); c.arrived = false; }
-          break;
+        case 'idle': this.updateIdle(dt, s); break;
         case 'terminal':
           a.typing = true;
           c.termT -= dt;
@@ -220,24 +268,108 @@ export class Actors {
           a.journalGlow = Math.max(a.journalGlow, 0.5);
           if (Math.floor(c.actionT / 0.9) !== Math.floor((c.actionT - dt) / 0.9)) this.fx.add({ x: L.nightstand.x + 4, y: L.nightstand.y - 7, life: 0.8, vy: -6, draw: (g, p) => px(g, p.x + (Math.floor(p.t * 20) % 3), p.y, '#1e1b4b') });
           break;
-        case 'reading':
-          a.bookOut = 1;
-          break;
-        case 'thinking':
-          if (!c.thought || c.thought.t < 0.2) c.thought = { text: '...', t: 2, dots: true };
-          break;
+        case 'reading': a.bookOut = 1; break;
+        case 'thinking': if (!c.thought || c.thought.t < 0.2) c.thought = { text: '...', t: 2, dots: true }; break;
         default: break;
       }
+      // small fidgets while busy, so he never looks frozen
+      if (act !== 'idle' && act !== 'sleeping') {
+        c.fidgetT -= dt;
+        if (c.fidgetT <= 0) {
+          c.fidgetT = rand(18, 40);
+          if (c.pose === 'stand') c.stretch = 2.2; else c.glance = 1.6;
+        }
+      }
     }
-    a.lampOn = (act === 'writing' || act === 'reading') && this.store.dayFactor() < 0.6;
+    a.lampOn = (act === 'writing' || act === 'reading' || (c.pastime && c.pastime.def.floor === 'upper')) && this.store.dayFactor() < 0.6;
     a.laptopOpen = act === 'remote';
     if (a.laptopOpen) { const st = String(s.clawd.status || '').toLowerCase(); a.laptopText = st.includes('telegram') || st.includes('reply') ? 'TG' : st.includes('ssh') ? 'SSH' : 'NET'; }
     a.monitorMode = act === 'terminal' ? 'terminal' : act === 'sleeping' ? 'off' : 'stats';
-    // TV channel
     this.tvT += dt;
     if (a.tvForce > 0) a.tvMode = 'cams';
-    else if (act === 'watching') { a.tvMode = (this.tvT % 16) < 10 ? 'cams' : 'dash'; }
+    else if (act === 'watching' || (c.pastime && (c.pastime.def.id === 'couch'))) a.tvMode = (this.tvT % 16) < 10 ? 'cams' : 'dash';
     else a.tvMode = 'cams';
+  }
+
+  // ---- idle pastimes
+  updateIdle(dt, s) {
+    const c = this.clawd;
+    const p = c.pastime;
+    if (!p) {
+      c.pauseT -= dt;
+      if (c.pauseT <= 0) this.pickPastime();
+      return;
+    }
+    if (p.phase === 'go') {
+      p.phase = 'do';
+      const lines = p.def.lines || [];
+      const line = p.forcedLine !== undefined ? p.forcedLine : (lines.length && chance(0.6) ? pick(lines) : null);
+      if (line === 'NEXT') { const n = this.store.nextCron(); if (n) this.say(`${n.name} in ${fmtDuration(n.mins)}`, 5); }
+      else if (line === 'MAIL') { const u = Number(s.telegram.unread || 0); this.say(u > 0 ? `POST! ${u} WAITING` : 'Nothing yet.', 5); }
+      else if (line) this.say(line, 5);
+      if (p.def.act === 'check') c.eyesWide = 1.2;
+    }
+    p.t -= dt;
+    this.runPastime(p, dt, s);
+    if (p.t <= 0) { c.pastime = null; c.pauseT = rand(1, 4); c.pose = c.pose === 'bedsit' ? 'stand' : c.pose; }
+  }
+
+  pickPastime() {
+    const c = this.clawd;
+    const bucket = dayBucket(this.store.hourNow());
+    const dark = this.store.dayFactor() < 0.5;
+    const pool = [];
+    for (const def of PASTIMES) {
+      if (def.forcedOnly) continue;
+      if (c.recent.includes(def.id)) continue;
+      if (def.dark && !dark) continue;
+      if (def.id === 'nap' && bucket === 'morning') continue;
+      const w = 1 + (def.when.includes(bucket) ? 2 : 0);
+      for (let i = 0; i < w; i++) pool.push(def);
+    }
+    let def = pick(pool);
+    let target = def;
+    if (def.wander) {
+      const places = PASTIMES.filter((d) => d.x != null && !d.forcedOnly && d.id !== 'mailbox' && d.id !== 'tree');
+      target = pick(places);
+    }
+    this.startPastime(def, target);
+  }
+
+  forcePastime(id, line) {
+    const def = PASTIME_BY_ID[id];
+    if (!def) return;
+    this.clawd.pose = this.clawd.pose === 'bed' ? 'bed' : this.clawd.pose;
+    this.startPastime(def, def, line);
+  }
+
+  startPastime(def, target, forcedLine) {
+    const c = this.clawd;
+    c.pastime = { def, t: rand(def.dur[0], def.dur[1]), phase: 'go', forcedLine };
+    c.recent = [...c.recent, def.id].slice(-4);
+    if (target.x != null) this.walkTo(target.x, target.floor, { face: target.face, sit: def.wander ? null : target.sit });
+    else { c.dest = { face: c.face }; c.arrived = true; if (c.pose === 'bedsit') c.pose = 'stand'; }
+    if (def.act === 'dance') c.dance = c.pastime.t;
+    if (def.act === 'stretch') c.stretch = c.pastime.t;
+  }
+
+  runPastime(p, dt, s) {
+    const c = this.clawd;
+    const tick = (every) => Math.floor(p.t / every) !== Math.floor((p.t + dt) / every);
+    switch (p.def.act) {
+      case 'lookup': c.lookUp = 0.5; break;
+      case 'nap': c.napping = true; if (tick(2.5)) this.fx.zzz(c.x + 6, c.y - 30); break;
+      case 'pet': c.petting = true; this.dog.alertT = 0.6; if (tick(0.8)) this.fx.heart(L.dogBed.x + randInt(2, 16), L.dogBed.y - 8); break;
+      case 'water':
+        c.watering = true;
+        if (tick(0.22)) this.fx.add({ x: L.plant.x + randInt(2, 11), y: L.plant.y - 2, life: 0.5, vy: 30, draw: (g, q) => px(g, q.x, q.y, '#60a5fa') });
+        break;
+      case 'browse': this.anim.bookOut = 1; break;
+      case 'radio': this.anim.radioPing = 1; if (tick(0.6)) this.fx.note(L.radio.x + randInt(0, 18), L.radio.y - 4); break;
+      case 'dance': c.dance = Math.max(c.dance, 0.2); if (tick(0.5)) this.fx.note(c.x + randInt(-6, 10), c.y - 22); break;
+      case 'stretch': c.stretch = Math.max(c.stretch, 0.2); break;
+      default: break;
+    }
   }
 
   setActivity(act, s) {
@@ -245,38 +377,41 @@ export class Actors {
     const prev = c.activity;
     c.activity = act;
     c.actionT = 0;
+    c.pastime = null;
+    c.pauseT = rand(0.5, 2);
     this.anim.bookOut = 0;
     if (prev === 'terminal') this.anim.termLines = [];
+    this.store.logActivity(act);
     const spot = SPOTS[act];
     if (!spot) {
       // speaking / looking / thinking happen wherever he is; if he's in bed, get up to the living room
-      if (c.pose === 'bed') { this.walkTo(SPOTS.idle.x, 'lower'); c.pose = 'stand'; }
+      if (c.pose === 'bed') { this.walkTo(SPOTS.idle.x, 'lower', { face: 1 }); }
       c.arrived = true;
       return;
     }
-    c.pose = 'stand';
-    this.walkTo(spot.x, spot.floor);
-    if (spot.wander && c.floor === 'lower' && Math.abs(c.x - spot.x) < 40) { c.path = []; c.arrived = true; }
-    c.wanderT = rand(3, 7);
+    if (act === 'idle') { c.arrived = true; if (c.pose === 'bed') this.walkTo(SPOTS.idle.x, 'lower', { face: 1 }); return; }
+    this.walkTo(spot.x, spot.floor, { face: spot.face, sit: spot.sit, bed: spot.bed });
   }
 
-  walkTo(x, floor) {
+  walkTo(x, floor, dest = {}) {
     const c = this.clawd;
     let from = { x: c.x, floor: c.floor };
     if (c.pose === 'bed') { c.x = L.bed.x + 60; c.floor = 'upper'; c.y = feetY('upper'); from = { x: c.x, floor: 'upper' }; }
     c.pose = 'stand';
+    c.dest = dest;
     c.path = planPath(from, { x, floor });
     c.arrived = false;
-    if (c.path.length === 1 && Math.abs(c.path[0].x - c.x) < 1 && c.path[0].floor === c.floor) { c.path = []; c.arrived = true; this.onArrive(c.activity); }
+    if (c.path.length === 1 && Math.abs(c.path[0].x - c.x) < 1 && c.path[0].floor === c.floor) { c.path = []; c.arrived = true; this.onArrive(); }
   }
 
-  onArrive(act) {
+  onArrive() {
     const c = this.clawd;
-    const spot = SPOTS[act];
-    if (!spot) return;
-    c.face = spot.face || c.face;
-    if (spot.bed) c.pose = 'bed';
-    else if (spot.sit) c.pose = spot.sit === 'couch' ? 'couch' : 'chair';
+    const d = c.dest || {};
+    if (d.face) c.face = d.face;
+    if (d.bed) c.pose = 'bed';
+    else if (d.sit === 'couch') c.pose = 'couch';
+    else if (d.sit === 'chair') c.pose = 'chair';
+    else if (d.sit === 'bed') c.pose = 'bedsit';
     else c.pose = 'stand';
   }
 
@@ -350,6 +485,43 @@ export class Actors {
     return roomAt(c.x, c.floor);
   }
 
+  // What the title bar says he is doing.
+  phrase() {
+    const c = this.clawd;
+    const act = this.store.effectiveActivity();
+    if (act === 'idle' && c.pastime) {
+      if (c.moving) return c.pastime.def.wander ? 'pottering about' : `off to ${c.pastime.def.phrase.replace(/^(looking|checking|chilling|napping|petting|listening|peeking|watering|browsing|sitting|chatting|answering|having|stargazing|stretching|pottering)/, (m) => ({ looking: 'look', checking: 'check', chilling: 'chill', napping: 'nap', petting: 'pet', listening: 'listen', peeking: 'peek', watering: 'water', browsing: 'browse', sitting: 'sit', chatting: 'chat', answering: 'answer', having: 'have', stargazing: 'stargaze', stretching: 'stretch', pottering: 'potter' })[m])}`;
+      return c.pastime.def.phrase;
+    }
+    if (act === 'idle') return c.moving ? 'pottering about' : 'having a breather';
+    return PHRASES[act] || act;
+  }
+
+  // Tap target + stats for Clawd himself.
+  clawdItem() {
+    return {
+      id: 'clawd',
+      rect: this.clawd.rect,
+      title: 'Clawd',
+      body: 'That is me. Where I am and what I am doing comes from the homelab; the little things in between are mine.',
+      stats: (s, store) => {
+        const log = store.activityLog || [];
+        const last = log[log.length - 1];
+        const since = last ? fmtDuration((Date.now() - last.at) / 60000) : '—';
+        const counts = {};
+        const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+        for (const e of log) if (e.at >= dayStart.getTime()) counts[e.activity] = (counts[e.activity] || 0) + 1;
+        const today = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ×${v}`).join(', ') || '—';
+        const o = { doing: this.phrase(), activity: store.effectiveActivity(), 'for': since, status: s.clawd.status || '—', mood: s.clawd.mood || '—' };
+        if (this.clawd.pastime) o.pastime = this.clawd.pastime.def.id;
+        o['today'] = today;
+        o['last active'] = s.clawd.last_active ? fmtDuration((Date.now() - s.clawd.last_active) / 60000) + ' ago' : '—';
+        return o;
+      },
+      spark: null,
+    };
+  }
+
   // ------------------------------------------------------------ draw
   // Bubbles are queued while drawing and rendered after the lighting pass so they stay bright at night.
   drawLate(ctx) {
@@ -401,12 +573,11 @@ export class Actors {
     const b = this.bus;
     if (!b) return;
     const x = Math.round(b.x), y = L.road.y - 18;
-    // van body
     rect(ctx, x, y + 2, 56, 14, '#f59e0b'); rect(ctx, x + 2, y, 52, 3, '#fbbf24');
     rect(ctx, x, y + 12, 56, 4, '#b45309');
     outline(ctx, x, y + 2, 56, 14, '#1a1216');
     for (let i = 0; i < 4; i++) box(ctx, x + 4 + i * 12, y + 4, 9, 6, '#bae6fd', '#1a1216');
-    rect(ctx, x + 50, y + 6, 6, 4, '#bae6fd'); // windscreen
+    rect(ctx, x + 50, y + 6, 6, 4, '#bae6fd');
     disc(ctx, x + 10, y + 17, 3, '#1a1216'); disc(ctx, x + 46, y + 17, 3, '#1a1216'); px(ctx, x + 10, y + 17, '#9ca3af'); px(ctx, x + 46, y + 17, '#9ca3af');
     px(ctx, x + 55, y + 11, '#fef08a'); px(ctx, x, y + 11, '#ef4444');
     text(ctx, 'CREW BUS', x + 10, y + 11, '#1a1216');
@@ -437,35 +608,36 @@ export class Actors {
       body = CLAWD_SIT;
       drawSprite(ctx, body, bx, by);
       this.drawEyes(ctx, bx, by, 1, true);
-      // blanket over him
       rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 11, '#2563eb');
       for (let x = L.bed.x + 24; x < L.bed.x + L.bed.w - 2; x += 6) rect(ctx, x, L.bed.y + 20, 3, 1, '#60a5fa');
       rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 1, '#93c5fd');
       drawSprite(ctx, CLAW, bx - 2, by + 9, { flip: true }); drawSprite(ctx, CLAW, bx + 15, by + 9);
       if (c.thought) this.late.push((g) => bubble(g, c.thought.text, bx + 8, by - 2, { thought: true, bg: '#eef2ff' }));
       if (c.alert > 0) this.late.push((g) => text(g, '!', bx + 7, by - 8, '#fbbf24', 2));
+      c.rect = [bx - 4, by - 6, 24, 26];
       return;
     }
-    if (c.pose === 'chair' || c.pose === 'couch') {
-      const seat = c.pose === 'chair' ? L.chair.y + 16 : L.couch.seatY;
-      bx = Math.round(c.x - 8); by = seat - 14;
+    const bob = c.dance > 0 && !c.moving ? (Math.floor(t * 6) % 2 ? -1 : 0) : 0;
+    if (c.pose === 'chair' || c.pose === 'couch' || c.pose === 'bedsit') {
+      const seat = c.pose === 'chair' ? L.chair.y + 16 : c.pose === 'couch' ? L.couch.seatY : 170;
+      bx = Math.round(c.x - 8); by = seat - 14 + bob;
       body = CLAWD_SIT;
     } else {
-      bx = Math.round(c.x - 8); by = Math.round(c.y - 17);
+      bx = Math.round(c.x - 8); by = Math.round(c.y - 17) + bob;
       body = c.moving ? (Math.floor(c.walkT * 7) % 2 ? CLAWD_WALK_A : CLAWD_WALK_B) : CLAWD_BODY;
     }
-    // shadow
-    rect(ctx, bx + 3, (c.pose === 'stand' ? Math.round(c.y) : by + 14) - 0, 10, 1, 'rgba(0,0,0,0.25)');
+    rect(ctx, bx + 3, (c.pose === 'stand' ? Math.round(c.y) : by + 14 - bob), 10, 1, 'rgba(0,0,0,0.25)');
     drawSprite(ctx, body, bx, by, { flip: face < 0 });
-    this.drawEyes(ctx, bx, by, face, false);
+    this.drawEyes(ctx, bx, by, face, c.napping);
     this.drawClaws(ctx, bx, by, face);
-    // extras above the head
+    c.rect = [bx - 4, by - 8, 24, 28];
     if (this.anim.eyeIcon > 0) drawSprite(ctx, EYE_ICON, bx + 4, by - 9);
     if (c.activity === 'browsing' && !c.moving) {
       const k = Math.floor(t * 2) % 3;
       text(ctx, 'WWW' + '.'.repeat(k), bx + 2, by - 8, '#93c5fd');
     }
-    if (c.activity === 'reading' && !c.moving) drawSprite(ctx, BOOK, face > 0 ? bx + 17 : bx - 7, by + 8 + (Math.floor(t * 2) % 2));
+    const browsing = (c.activity === 'reading' || (c.pastime && c.pastime.def.act === 'browse')) && !c.moving;
+    if (browsing) drawSprite(ctx, BOOK, face > 0 ? bx + 17 : bx - 7, by + 8 + (Math.floor(t * 2) % 2));
     if (c.thought && c.pose !== 'bed') {
       const txt = c.thought.dots ? '.'.repeat(1 + Math.floor(t * 2) % 3) : c.thought.text;
       this.late.push((g) => bubble(g, txt, bx + 8, by - 2, { thought: true, bg: '#eef2ff' }));
@@ -486,14 +658,16 @@ export class Actors {
     if (c.eyesWide > 0) {
       for (const [i, x] of ex.entries()) {
         rect(ctx, x - 1, by + 5, 3, 3, '#ffffff');
-        px(ctx, x + (face > 0 ? 1 : -1) + 0, by + 6, '#1e1b4b');
+        px(ctx, x + (face > 0 ? 1 : -1), by + 6, '#1e1b4b');
         if (i === 1) px(ctx, x + 1, by + 5, '#22d3ee');
       }
       return;
     }
+    const side = c.glance > 0 ? (face > 0 ? 0 : 1) : (face > 0 ? 1 : 0);
+    const row = c.lookUp > 0 ? 6 : 7;
     for (const x of ex) {
       rect(ctx, x, by + 6, 2, 2, '#ffffff');
-      px(ctx, x + (face > 0 ? 1 : 0), by + 7, '#1e1b4b');
+      px(ctx, x + side, by + row, '#1e1b4b');
     }
     if (c.happy > 0) for (const x of ex) { px(ctx, x, by + 6, '#4c2bb0'); px(ctx, x + 1, by + 6, '#4c2bb0'); }
   }
@@ -504,28 +678,27 @@ export class Actors {
     const a = this.anim;
     const left = (x, y) => drawSprite(ctx, CLAW, x, y, { flip: true });
     const right = (x, y) => drawSprite(ctx, CLAW, x, y);
-    if (a.typing || c.activity === 'remote' && !c.moving) {
-      const k = Math.floor(t * 8) % 2;
-      const fx = face > 0 ? bx + 16 : bx - 3;
-      if (face > 0) { right(fx, by + 10 + k); right(fx + 3, by + 11 - k); } else { left(fx, by + 10 + k); left(fx - 3, by + 11 - k); }
-      return;
-    }
-    if ((c.activity === 'reading' || c.activity === 'writing' || c.activity === 'tinkering') && !c.moving) {
-      const k = Math.floor(t * 3) % 2;
-      if (face > 0) { right(bx + 15, by + 8 + k); right(bx + 15, by + 12 - k); } else { left(bx - 2, by + 8 + k); left(bx - 2, by + 12 - k); }
-      return;
-    }
+    const fwd = (x, y) => (face > 0 ? right(bx + 15 + x, by + y) : left(bx - 2 - x, by + y)); // the claw on the side he faces
+    const back = (x, y) => (face > 0 ? left(bx - 2 - x, by + y) : right(bx + 15 + x, by + y));
     if (c.moving) {
       const k = Math.floor(c.walkT * 7) % 2;
       left(bx - 2, by + 9 + k); right(bx + 15, by + 10 - k);
       return;
     }
-    if (c.activity === 'delegating' && !c.moving) {
-      // waving the bots off
-      const k = Math.floor(t * 4) % 2;
-      left(bx - 2, by + 10); right(bx + 15, by + 2 - k * 2);
+    if (c.stretch > 0) { left(bx - 2, by + 1); right(bx + 15, by + 1); return; }
+    if (c.dance > 0) { const k = Math.floor(t * 6) % 2; left(bx - 2, by + (k ? 2 : 10)); right(bx + 15, by + (k ? 10 : 2)); return; }
+    if (c.petting) { fwd(1, 13 + (Math.floor(t * 4) % 2)); back(0, 10); return; }
+    if (c.watering) { fwd(2, 4 + (Math.floor(t * 3) % 2)); back(0, 10); return; }
+    if (a.typing || (c.activity === 'remote' && !c.moving) || c.pose === 'chair') {
+      const k = c.pose === 'chair' && !a.typing && c.activity !== 'remote' ? 0 : Math.floor(t * 8) % 2;
+      const fx = face > 0 ? bx + 16 : bx - 3;
+      if (face > 0) { right(fx, by + 10 + k); right(fx + 3, by + 11 - k); } else { left(fx, by + 10 + k); left(fx - 3, by + 11 - k); }
       return;
     }
+    const busyHands = ['reading', 'writing', 'tinkering'].includes(c.activity) || (c.pastime && ['browse', 'check', 'radio'].includes(c.pastime.def.act));
+    if (busyHands) { const k = Math.floor(t * 3) % 2; fwd(0, 8 + k); fwd(0, 12 - k); return; }
+    if (c.activity === 'delegating') { const k = Math.floor(t * 4) % 2; left(bx - 2, by + 10); right(bx + 15, by + 2 - k * 2); return; }
+    if (c.lookUp > 0 && c.pose === 'stand') { left(bx - 2, by + 11); right(bx + 15, by + 11); return; }
     left(bx - 2, by + 10); right(bx + 15, by + 10);
   }
 }

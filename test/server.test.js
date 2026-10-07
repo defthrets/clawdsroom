@@ -88,6 +88,14 @@ test('patches, dotted keys, events and the stream', async () => {
   assert.equal(r.status, 400);
 });
 
+test('history samples the headline numbers', async () => {
+  const h = await (await fetch(`${BASE}/api/history`)).json();
+  assert.ok(Array.isArray(h) && h.length >= 1);
+  const last = h[h.length - 1];
+  assert.equal(last.battery, 42);
+  assert.ok(typeof last.t === 'number');
+});
+
 test('state is persisted to disk', async () => {
   await new Promise((r) => setTimeout(r, 2600));
   const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'state.json'), 'utf8'));

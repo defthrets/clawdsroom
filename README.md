@@ -39,8 +39,16 @@ Also included: a `Dockerfile` + `compose.yaml`, and a systemd unit in `deploy/`.
 
 The page keeps a Server-Sent Events connection to the server, reconnects on its own, falls
 back to demo mode if the homelab goes away (and comes back when it returns), and reloads
-itself once a day so a 24/7 tab never goes stale. Tap anything in the house to see what it
-represents and its live numbers.
+itself once a day so a 24/7 tab never goes stale.
+
+**Tap anything** in the house (or a tile in the stat strip) for a card with what it represents,
+its live numbers, and a trend chart of the last few hours where there is one. Tap Clawd himself
+for what he is doing, for how long, and what he has been up to today.
+
+When the homelab hasn't given him a job (`clawd.activity` is `idle`) he potters about on his
+own: looks out of the window, chills or naps on the couch, pets the dog, checks the post,
+chats to the bird, waters the plant, browses the shelves, checks the battery, has a little
+dance. He only stands still while he is actually doing something or having a breather.
 
 ## Wiring it to the homelab
 

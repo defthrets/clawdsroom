@@ -28,9 +28,11 @@ export function connect(store, { onMode, demoForced = false, fallbackMs = 4000 }
     es.addEventListener('state', (m) => {
       try {
         const s = JSON.parse(m.data);
-        if (demo) { demo.stop(); demo = null; }
+        if (demo) { demo.stop(); demo = null; store.history = []; }
+        const first = !gotState;
         store.set(s);
         gotState = true;
+        if (first || store.history.length < 2) fetch('/api/history', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).then((h) => store.setHistory(h)).catch(() => {});
         retry = 0;
         if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
         setMode('live');

@@ -12,6 +12,32 @@ export class Store {
     this.mode = 'connecting'; // connecting | live | demo | lost
     this.lastSeen = 0;
     this.hourOverride = null; // ?hour=23 for testing the day/night cycle
+    this.history = [];        // [{t, cpu, ram, temp, battery, solar_w, load_w, disk_root, disk_mnt}] for the trend charts
+    this.historyMax = 720;
+    this.historyInterval = 30000;
+    this.activityLog = [];    // [{activity, at}] what Clawd has been up to (client-side)
+  }
+
+  setHistory(list) {
+    if (Array.isArray(list)) this.history = list.slice(-this.historyMax);
+    this.sample(true);
+  }
+
+  // Keep one sample per 30s of the headline numbers so taps can show a trend.
+  sample(force = false) {
+    const now = Date.now();
+    const last = this.history[this.history.length - 1];
+    if (!force && last && now - last.t < this.historyInterval) return;
+    const sys = this.state.system || {}, pw = this.state.power || {};
+    this.history.push({ t: now, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null, battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null });
+    if (this.history.length > this.historyMax) this.history.splice(0, this.history.length - this.historyMax);
+  }
+
+  logActivity(activity) {
+    const last = this.activityLog[this.activityLog.length - 1];
+    if (last && last.activity === activity) return;
+    this.activityLog.push({ activity, at: Date.now() });
+    if (this.activityLog.length > 80) this.activityLog.shift();
   }
 
   on(kind, fn) { this.listeners[kind].add(fn); return () => this.listeners[kind].delete(fn); }
@@ -21,6 +47,7 @@ export class Store {
   set(state) {
     this.state = deepMerge(clone(DEFAULT_STATE), state || {});
     this.lastSeen = Date.now();
+    this.sample();
     this.emitState();
   }
 
@@ -28,6 +55,7 @@ export class Store {
     this.state = deepMerge(this.state, expandDots(patch));
     this.state.meta.updated = Date.now();
     this.lastSeen = Date.now();
+    this.sample();
     this.emitState();
   }
 

@@ -7,6 +7,7 @@
 //   PUT  /api/state         replace the whole state (merged over defaults)
 //   POST /api/event         push an event {type, ...}; also updates counters, see docs/STATE.md
 //   GET  /api/events        recent events
+//   GET  /api/history       recent samples of cpu/ram/temp/battery/solar (for the trend charts)
 //   GET  /api/stream        Server-Sent Events: "state" and "event" messages
 //   GET  /api/health        {ok: true}
 //
@@ -28,6 +29,9 @@ const ROOT = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
+const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const HISTORY_MAX = 720;            // samples kept (6h at one per 30s)
+const HISTORY_INTERVAL_MS = 30000;
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
 const TOKEN = process.env.CLAWDSROOM_TOKEN || '';
@@ -51,6 +55,7 @@ const MIME = {
 
 // ---------------------------------------------------------------- state
 let state = clone(DEFAULT_STATE);
+let history = [];
 const clients = new Set();
 let saveTimer = null;
 
@@ -63,6 +68,22 @@ function loadState() {
   } catch (e) {
     if (e.code !== 'ENOENT') console.warn(`[room] could not load ${STATE_FILE}: ${e.message}`);
   }
+  try {
+    const h = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    if (Array.isArray(h)) history = h.slice(-HISTORY_MAX);
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.warn(`[room] could not load ${HISTORY_FILE}: ${e.message}`);
+  }
+}
+
+// One sample every HISTORY_INTERVAL_MS at most, taken whenever the state changes.
+function sampleHistory() {
+  const now = Date.now();
+  const last = history[history.length - 1];
+  if (last && now - last.t < HISTORY_INTERVAL_MS) return;
+  const sys = state.system || {}, pw = state.power || {};
+  history.push({ t: now, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null, battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null });
+  if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
 }
 
 function scheduleSave() {
@@ -74,6 +95,8 @@ function scheduleSave() {
       const tmp = `${STATE_FILE}.tmp`;
       await fsp.writeFile(tmp, JSON.stringify(state, null, 2));
       await fsp.rename(tmp, STATE_FILE);
+      await fsp.writeFile(`${HISTORY_FILE}.tmp`, JSON.stringify(history));
+      await fsp.rename(`${HISTORY_FILE}.tmp`, HISTORY_FILE);
     } catch (e) {
       console.warn(`[room] could not save state: ${e.message}`);
     }
@@ -91,6 +114,7 @@ function patchState(patch, { quiet = false } = {}) {
   const expanded = expandDots(patch);
   state = deepMerge(state, expanded);
   state.meta.updated = Date.now();
+  sampleHistory();
   scheduleSave();
   if (!quiet) broadcast('state', state);
   return state;
@@ -99,6 +123,7 @@ function patchState(patch, { quiet = false } = {}) {
 function pushEvent(ev) {
   const event = { ...ev, at: ev.at || Date.now() };
   state = applyEvent(state, event);
+  sampleHistory();
   scheduleSave();
   broadcast('event', event);
   broadcast('state', state);
@@ -229,6 +254,7 @@ async function handle(req, res) {
 
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, state);
     if (p === '/api/events' && req.method === 'GET') return send(res, 200, state.events || []);
+    if (p === '/api/history' && req.method === 'GET') return send(res, 200, history);
 
     const writing = req.method === 'POST' || req.method === 'PUT';
     if (writing && !authorized(req, url)) return send(res, 401, { error: 'unauthorized' });
