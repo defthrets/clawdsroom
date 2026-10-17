@@ -1,7 +1,7 @@
 // The house: layout constants, static furniture, sky, lighting, and the item registry.
 // Everything is drawn in a 480x360 logical pixel space. Actors (Clawd, dog, bird, bots) live in actors.js.
 
-import { rect, box, outline, hline, vline, disc, px, line, text, textCentered, mix, lerp, clamp, drawSprite, makeCanvas } from './util.js';
+import { rect, box, outline, hline, vline, disc, px, line, text, textCentered, textWidth, mix, lerp, clamp, drawSprite, makeCanvas } from './util.js';
 import { BOOK, PLANE, CREW, WATERING_CAN } from './sprites.js';
 import { fmtAgo, fmtUptime, fmtDuration } from './util.js';
 
@@ -26,47 +26,58 @@ export const L = {
   ladder: { x: 248, top: 100, bottom: 190 },
   hatch: { x: 241, w: 14 },
   loftWalk: [114, 350],
-  frontDoor: { x: 72, y: 270, w: 12, h: 30 },
+  frontDoor: { x: 72, y: 252, w: 32, h: 48 },
   garageDoor: { x: 458, y: 268, w: 4, h: 32 },
   mailbox: { x: 8, y: 270 },
   tree: { x: 34, canopyY: 240, r: 17 },
   perch: { x: 42, y: 252 },
-  dogBed: { x: 262, y: 292, w: 22, h: 8 },
-  bigPlant: { x: 86, y: 300, w: 30 },
+  dogBed: { x: 252, y: 288, w: 34, h: 12 },
+  bigPlant: { x: 100, y: 300, w: 26 },
   can: { x: 112, y: 293 },
-  radio: { x: 122, y: 206, w: 22, h: 10, shelfY: 216 },
-  tv: { x: 118, y: 244, w: 48, h: 36 },
-  tvStand: { x: 118, y: 282, w: 48, h: 18 },
-  couch: { x: 176, y: 268, w: 50, h: 32, seatY: 282 },
-  crewPhoto: { x: 180, y: 212, w: 44, h: 26 },
+  radio: { x: 190, y: 234, w: 22, h: 10, shelfY: 244 },
+  tv: { x: 128, y: 250, w: 44, h: 36 },
+  tvStand: { x: 136, y: 288, w: 34, h: 12 },
+  couch: { x: 172, y: 268, w: 56, h: 32, seatY: 287 },
+  crewPhoto: { x: 128, y: 200, w: 44, h: 26 },
   bed: { x: 80, y: 152, w: 72 },
-  nightstand: { x: 156, y: 172, w: 18, h: 18 },
-  clock: { cx: 202, cy: 124, r: 9 },
-  wardrobe: { x: 182, y: 144, w: 28, h: 46 },
+  nightstand: { x: 153, y: 172, w: 18, h: 18 },
+  clock: { cx: 166, cy: 122, r: 9 },
+  wardrobe: { x: 177, y: 118, w: 32, h: 72 },
   guitar: { x: 210, y: 158 },
   photoWall: { x: 256, y: 112, cols: 2, rows: 3, fw: 12, fh: 10, gap: 4 },
-  bookshelf: { x: 296, y: 118, w: 42, h: 72, shelves: 5 },
-  cabinet: { x: 344, y: 150, w: 18, h: 40 },
-  plant: { x: 368, y: 166 },
-  chair: { x: 292, y: 268 },
+  bookshelf: { x: 292, y: 118, w: 42, h: 72, shelves: 5 },
+  cabinet: { x: 326, y: 150, w: 18, h: 40 },
+  plant: { x: 358, y: 166 },
+  chair: { x: 292, y: 268, seatY: 284 },
   desk: { x: 306, y: 272, w: 62, h: 28 },
-  monitor: { x: 312, y: 240, w: 36, h: 28 },
+  monitor: { x: 314, y: 240, w: 32, h: 24 },
   keyboard: { x: 310, y: 273, w: 24, h: 3 },
   laptop: { x: 352, y: 264, w: 14, h: 8 },
   cupboard: { x: 370, y: 232, w: 18, h: 68 },
   speaker: { x: 374, y: 220, w: 10, h: 12 },
   thermo: { x: 300, y: 206, h: 26 },
   whiteboard: { x: 310, y: 206, w: 51, h: 30 },
-  dogBowl: { x: 287, y: 296 },
+  dogBowl: { x: 243, y: 296 },
   broom: { x: 393, y: 262 },
   garageShelf: { x: 394, y: 204, w: 62, h: 30 },
-  battery: { x: 396, y: 240, w: 18, h: 34 },
-  pegboard: { x: 424, y: 244, w: 32, h: 26 },
-  workbench: { x: 424, y: 276, w: 32, h: 24 },
+  battery: { x: 396, y: 236, w: 18, h: 34 },
+  pegboard: { x: 424, y: 236, w: 32, h: 26 },
+  workbench: { x: 412, y: 270, w: 48, h: 30 },
   botDock: { x: 398, y: 290 },
   signpost: { x: 470, y: 268 },
   panels: { x: 132, y: 32, n: 4, w: 22, h: 8, gap: 3 },
   chimney: { x: 300, y: 18, w: 12, h: 24 },
+  // how the generated furniture is used: seat heights as a fraction of the sprite, overlay anchors
+  gen: {
+    bedBlanketFrac: 0.55,   // rows of the bed sprite below this fraction are redrawn over Clawd
+    bedSleepX: 14, bedSleepYFrac: 0.12,
+    couchSeatFrac: 0.42, chairSeatFrac: 0.5,
+    shelfInsetTop: 4, shelfInsetBottom: 3, shelfInsetX: 3,
+    mailboxFlag: { dx: 0, dy: 2 },
+    treePerch: { dx: 52, dy: 44 },
+    crtScreen: { x: 0.32, y: 0.18, w: 0.59, h: 0.65 },
+    benchTopFrac: 0.4,
+  },
   // the loft
   telescope: { x: 106, y: 52 },
   skylight: { cx: 110, cy: 48, r: 5 },
@@ -188,9 +199,17 @@ export function drawGround(ctx, day) {
 
 export function drawTree(ctx, day, t) {
   const { x, canopyY, r } = L.tree;
+  const img = propImage('tree');
+  if (img) {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const tx = x - Math.round(w / 2) + 2, ty = L.groundY - h;
+    drawProp(ctx, 'tree', tx, ty, { flip: true });
+    L.perch.x = tx + L.gen.treePerch.dx; L.perch.y = ty + L.gen.treePerch.dy;
+    return;
+  }
+  L.perch.x = 42; L.perch.y = 252;
   rect(ctx, x - 2, canopyY, 4, L.groundY - canopyY, C.woodDk);
   rect(ctx, x - 1, canopyY, 1, L.groundY - canopyY, C.wood);
-  // branch for the bird
   line(ctx, x + 1, 257, L.perch.x + 8, L.perch.y + 1, C.woodDk);
   line(ctx, x + 1, 256, L.perch.x + 8, L.perch.y, C.wood);
   const g1 = day > 0.4 ? '#3f8f3a' : '#2b5a2d', g2 = day > 0.4 ? '#56a84a' : '#36703a';
@@ -205,6 +224,15 @@ export function drawTree(ctx, day, t) {
 
 export function drawMailbox(ctx, unread, flagUp) {
   const { x, y } = L.mailbox;
+  const img = propImage('mailbox');
+  if (img) {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const mx = x - 4, my = L.groundY - h;
+    drawProp(ctx, 'mailbox', mx, my);
+    if (flagUp) { const fx = mx + w - 3 + L.gen.mailboxFlag.dx, fy = my + L.gen.mailboxFlag.dy; rect(ctx, fx, fy - 6, 1, 8, '#ef4444'); rect(ctx, fx, fy - 6, 4, 3, '#ef4444'); }
+    if (unread > 0) textCentered(ctx, String(Math.min(unread, 99)), mx + w / 2, my - 9, '#fde68a');
+    return;
+  }
   rect(ctx, x + 4, y + 8, 2, L.groundY - y - 8, C.woodDk);
   box(ctx, x, y, 12, 8, '#3b82f6', C.outline, '#93c5fd');
   px(ctx, x + 10, y + 4, '#1e3a8a');
@@ -226,8 +254,10 @@ export function drawSignpost(ctx, wan, day) {
 
 export function drawFrontDoor(ctx, open) {
   const d = L.frontDoor;
-  box(ctx, d.x, d.y, d.w, d.h, open ? '#1a1216' : C.wood, C.outline, open ? null : C.woodLt, open ? null : C.woodDk);
-  if (!open) { px(ctx, d.x + 9, d.y + 16, '#fde68a'); rect(ctx, d.x + 3, d.y + 4, 6, 8, C.woodDk); }
+  if (open) { rect(ctx, d.x, d.y, d.w, d.h, '#1a1216'); return; }
+  if (drawPropBottom(ctx, 'door', d.x, L.feet.lower)) return;
+  box(ctx, d.x, d.y, d.w, d.h, C.wood, C.outline, C.woodLt, C.woodDk);
+  px(ctx, d.x + d.w - 4, d.y + Math.round(d.h / 2), '#fde68a'); rect(ctx, d.x + 3, d.y + 4, d.w - 6, Math.round(d.h / 3), C.woodDk);
 }
 
 // ----------------------------------------------------------------- house shell
@@ -394,21 +424,29 @@ export function drawBedroom(ctx, store, t, anim) {
   // rug
   rect(ctx, 100, 186, 60, 4, '#b45309'); for (let x = 102; x < 160; x += 6) rect(ctx, x, 187, 3, 2, '#d97706');
   // bed
-  rect(ctx, b.x, b.y, 4, L.feet.upper - b.y, C.woodDk); rect(ctx, b.x + 1, b.y + 1, 2, 36, C.wood);
-  rect(ctx, b.x + 4, 182, b.w - 4, 8, C.wood); hline(ctx, b.x + 4, b.x + b.w - 1, 182, C.woodLt);
-  rect(ctx, b.x + 4, 170, b.w - 4, 12, C.white); hline(ctx, b.x + 4, b.x + b.w - 1, 181, '#cbd5e1');
-  rect(ctx, b.x + 6, 165, 14, 6, '#fef9c3'); outline(ctx, b.x + 6, 165, 14, 6, '#e5d9a0'); // pillow
-  rect(ctx, b.x + b.w, 184, 2, 6, C.woodDk);
+  const bedH = drawPropBottom(ctx, 'bed', b.x, L.feet.upper);
+  if (!bedH) {
+    rect(ctx, b.x, b.y, 4, L.feet.upper - b.y, C.woodDk); rect(ctx, b.x + 1, b.y + 1, 2, 36, C.wood);
+    rect(ctx, b.x + 4, 182, b.w - 4, 8, C.wood); hline(ctx, b.x + 4, b.x + b.w - 1, 182, C.woodLt);
+    rect(ctx, b.x + 4, 170, b.w - 4, 12, C.white); hline(ctx, b.x + 4, b.x + b.w - 1, 181, '#cbd5e1');
+    rect(ctx, b.x + 6, 165, 14, 6, '#fef9c3'); outline(ctx, b.x + 6, 165, 14, 6, '#e5d9a0'); // pillow
+    rect(ctx, b.x + b.w, 184, 2, 6, C.woodDk);
+  }
   // nightstand + lamp + journal
   const n = L.nightstand;
-  box(ctx, n.x, n.y, n.w, n.h, C.wood, C.outline, C.woodLt, C.woodDk);
-  rect(ctx, n.x + 2, n.y + 8, n.w - 4, 1, C.woodDk); px(ctx, n.x + 8, n.y + 4, '#fde68a'); px(ctx, n.x + 8, n.y + 12, '#fde68a');
+  const nsH = drawPropBottom(ctx, 'nightstand', n.x, L.feet.upper);
+  const nsTop = nsH ? L.feet.upper - nsH : n.y;
   const lampOn = anim.lampOn;
-  rect(ctx, n.x + 12, n.y - 7, 2, 7, C.metalDk);
-  rect(ctx, n.x + 9, n.y - 13, 8, 6, lampOn ? '#fde68a' : '#d6b35a'); outline(ctx, n.x + 9, n.y - 13, 8, 6, C.woodDk);
-  if (lampOn) { ctx.globalAlpha = 0.22; rect(ctx, n.x + 6, n.y - 7, 14, 4, '#fde68a'); rect(ctx, n.x + 4, n.y - 3, 18, 3, '#fde68a'); ctx.globalAlpha = 1; }
-  drawSprite(ctx, BOOK, n.x + 2, n.y - 5);
-  if (anim.journalGlow > 0) { outline(ctx, n.x + 1, n.y - 6, 8, 7, '#fde68a'); }
+  if (!nsH) {
+    box(ctx, n.x, n.y, n.w, n.h, C.wood, C.outline, C.woodLt, C.woodDk);
+    rect(ctx, n.x + 2, n.y + 8, n.w - 4, 1, C.woodDk); px(ctx, n.x + 8, n.y + 4, '#fde68a'); px(ctx, n.x + 8, n.y + 12, '#fde68a');
+    rect(ctx, n.x + 12, n.y - 7, 2, 7, C.metalDk);
+    rect(ctx, n.x + 9, n.y - 13, 8, 6, lampOn ? '#fde68a' : '#d6b35a'); outline(ctx, n.x + 9, n.y - 13, 8, 6, C.woodDk);
+  }
+  if (lampOn) { ctx.globalAlpha = 0.22; rect(ctx, n.x + 4, nsTop - 8, 20, 8, '#fde68a'); ctx.globalAlpha = 1; }
+  const jx = nsH ? n.x + 1 : n.x + 2, jy = nsH ? nsTop + 9 : n.y - 5;
+  drawSprite(ctx, BOOK, jx, jy);
+  if (anim.journalGlow > 0) { outline(ctx, jx - 1, jy - 1, 8, 7, '#fde68a'); }
   // wall clock with cron ticks
   drawClock(ctx, store, t, anim.clockShake);
   // wardrobe with a mirror on the door (+ the guitar leaning next to it)
@@ -466,46 +504,62 @@ export function drawLibrary(ctx, store, t, anim) {
     miniPhoto(ctx, x + 1, y + 1, p.fw - 2, p.fh - 2, seed);
     if (anim.photoFlash > 0 && i === anim.photoFlashIndex) { ctx.globalAlpha = Math.min(1, anim.photoFlash); rect(ctx, x, y, p.fw, p.fh, '#fff'); ctx.globalAlpha = 1; }
   }
-  text(ctx, `${fmtCount(s.immich.photos)} PHOTOS`, p.x, p.y + p.rows * (p.fh + p.gap) + 1, '#e9d5ff');
-  // bookshelf (memory)
+  text(ctx, `${fmtCount(s.immich.photos)} PHOTOS`, p.x, p.y - 6, '#e9d5ff');
+  // bookshelf (memory): the generated bookcase is empty, the books are the notes count
   const b = L.bookshelf;
-  box(ctx, b.x, b.y, b.w, b.h, C.wood, C.outline, C.woodLt, C.woodDk);
-  rect(ctx, b.x + 2, b.y + 2, b.w - 4, b.h - 4, '#3d2817');
-  const shelfH = Math.floor((b.h - 4) / b.shelves);
+  const bsH = drawPropBottom(ctx, 'bookshelf', b.x, L.feet.upper);
+  const bsW = bsH ? propSize('bookshelf').w : b.w;
+  const bsTop = bsH ? L.feet.upper - bsH : b.y;
+  if (!bsH) {
+    box(ctx, b.x, b.y, b.w, b.h, C.wood, C.outline, C.woodLt, C.woodDk);
+    rect(ctx, b.x + 2, b.y + 2, b.w - 4, b.h - 4, '#3d2817');
+  }
+  const innerTop = bsTop + (bsH ? L.gen.shelfInsetTop : 2), innerBottom = L.feet.upper - (bsH ? L.gen.shelfInsetBottom : 2);
+  const shelfH = (innerBottom - innerTop) / b.shelves;
   const notes = Number(s.memory.notes || 0);
   const perBook = notes > 60 ? Math.ceil(notes / 60) : 1;
   const books = clamp(Math.ceil(notes / perBook), notes > 0 ? 1 : 0, 60);
   const cols = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316', '#14b8a6', '#ec4899'];
+  const perShelf = Math.max(6, Math.floor((bsW - 2 * (bsH ? L.gen.shelfInsetX : 4)) / 3));
   let n = 0;
   for (let sh = 0; sh < b.shelves; sh++) {
-    const y = b.y + 2 + (sh + 1) * shelfH;
-    rect(ctx, b.x + 2, y - 1, b.w - 4, 2, C.wood);
-    for (let i = 0; i < 12; i++) {
+    const y = Math.round(innerTop + (sh + 1) * shelfH);
+    if (!bsH) rect(ctx, b.x + 2, y - 1, b.w - 4, 2, C.wood);
+    for (let i = 0; i < perShelf; i++) {
       if (n >= books) break;
       const h = 7 + ((i * 7 + sh * 3) % 4);
-      const x = b.x + 4 + i * 3;
+      const x = b.x + (bsH ? L.gen.shelfInsetX : 4) + i * 3;
       rect(ctx, x, y - 1 - h, 2, h, cols[(i + sh * 5) % cols.length]);
       px(ctx, x, y - 1 - h + 2, '#00000055');
       n++;
     }
   }
-  if (anim.bookOut > 0) { drawSprite(ctx, BOOK, b.x - 8, b.y + 40 - Math.round(Math.sin(t * 3) * 2)); }
-  textCentered(ctx, `${fmtCount(notes)} NOTES`, b.x + b.w / 2, b.y - 7, '#fcd9b6');
+  if (anim.bookOut > 0) { drawSprite(ctx, BOOK, b.x - 8, bsTop + 40 - Math.round(Math.sin(t * 3) * 2)); }
+  textCentered(ctx, `${fmtCount(notes)} NOTES`, b.x + bsW / 2, bsTop - 7, '#fcd9b6');
   // filing cabinet (skills)
   const c = L.cabinet;
-  box(ctx, c.x, c.y, c.w, c.h, C.metal, C.outline, C.metalLt, C.metalDk);
-  for (let i = 0; i < 3; i++) {
-    const y = c.y + 2 + i * 12;
-    rect(ctx, c.x + 2, y, c.w - 4, 11, '#8b919c'); outline(ctx, c.x + 2, y, c.w - 4, 11, C.metalDk);
-    rect(ctx, c.x + 7, y + 4, 4, 2, C.metalLt);
-    if (i === 1) textCentered(ctx, String(s.memory.skills || 0), c.x + c.w / 2, y + 3, '#111827');
+  const cabH = drawPropBottom(ctx, 'cabinet', c.x, L.feet.upper);
+  const cabW = cabH ? propSize('cabinet').w : c.w;
+  const cabTop = cabH ? L.feet.upper - cabH : c.y;
+  if (!cabH) {
+    box(ctx, c.x, c.y, c.w, c.h, C.metal, C.outline, C.metalLt, C.metalDk);
+    for (let i = 0; i < 3; i++) {
+      const y = c.y + 2 + i * 12;
+      rect(ctx, c.x + 2, y, c.w - 4, 11, '#8b919c'); outline(ctx, c.x + 2, y, c.w - 4, 11, C.metalDk);
+      rect(ctx, c.x + 7, y + 4, 4, 2, C.metalLt);
+    }
   }
-  textCentered(ctx, 'SKILLS', c.x + c.w / 2, c.y - 7, '#fcd9b6');
+  const skillsStr = String(s.memory.skills || 0);
+  rect(ctx, c.x + cabW / 2 - textWidth(skillsStr) / 2 - 1, cabTop + Math.round((cabH || c.h) * 0.45) - 1, textWidth(skillsStr) + 2, 7, cabH ? '#f8fafc' : '#8b919c');
+  textCentered(ctx, skillsStr, c.x + cabW / 2, cabTop + Math.round((cabH || c.h) * 0.45), '#111827');
+  textCentered(ctx, 'SKILLS', c.x + cabW / 2, cabTop - 7, '#fcd9b6');
   // plant
   const pl = L.plant;
-  box(ctx, pl.x, pl.y + 14, 14, 10, '#b45309', C.outline);
-  rect(ctx, pl.x + 6, pl.y + 4, 2, 10, '#15803d');
-  disc(ctx, pl.x + 3, pl.y + 6, 3, '#22c55e'); disc(ctx, pl.x + 11, pl.y + 5, 3, '#22c55e'); disc(ctx, pl.x + 7, pl.y + 2, 3, '#4ade80');
+  if (!drawPropBottom(ctx, 'plant', pl.x, L.feet.upper)) {
+    box(ctx, pl.x, pl.y + 14, 14, 10, '#b45309', C.outline);
+    rect(ctx, pl.x + 6, pl.y + 4, 2, 10, '#15803d');
+    disc(ctx, pl.x + 3, pl.y + 6, 3, '#22c55e'); disc(ctx, pl.x + 11, pl.y + 5, 3, '#22c55e'); disc(ctx, pl.x + 7, pl.y + 2, 3, '#4ade80');
+  }
 }
 
 function miniPhoto(ctx, x, y, w, h, seed) {
@@ -532,16 +586,16 @@ function makeCamNoise() {
   let seed = 99;
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   for (let f = 0; f < 4; f++) {
-    const cv = makeCanvas(21, 15);
+    const cv = makeCanvas(19, 15);
     const g = cv.getContext('2d');
-    for (let y = 0; y < 15; y++) for (let x = 0; x < 21; x++) {
+    for (let y = 0; y < 15; y++) for (let x = 0; x < 19; x++) {
       const v = rnd();
       g.fillStyle = v < 0.08 ? '#2f5f3f' : v < 0.2 ? '#1f3f2f' : '#16302a';
       g.fillRect(x, y, 1, 1);
     }
     // a fence + ground line so it reads as a yard
-    g.fillStyle = '#2a4a3a'; g.fillRect(0, 11, 21, 4);
-    g.fillStyle = '#3a6a4a'; for (let x = 1; x < 21; x += 3) g.fillRect(x, 7, 1, 4);
+    g.fillStyle = '#2a4a3a'; g.fillRect(0, 11, 19, 4);
+    g.fillStyle = '#3a6a4a'; for (let x = 1; x < 19; x += 3) g.fillRect(x, 7, 1, 4);
     camNoise.push(cv);
   }
 }
@@ -551,45 +605,66 @@ export function drawLivingRoom(ctx, store, t, anim) {
   const day = store.dayFactor();
   // the big plant (watered at sunrise and sunset)
   drawBigPlant(ctx, store, t, anim);
-  // the Tapos, up on the wall above the TV
-  box(ctx, L.tv.x + 2, L.tv.y - 10, 6, 4, C.metalLt, C.outline); px(ctx, L.tv.x + 4, L.tv.y - 9, (Math.floor(t * 2) % 2) ? '#ef4444' : '#7f1d1d');
-  box(ctx, L.tv.x + L.tv.w - 8, L.tv.y - 10, 6, 4, C.metalLt, C.outline); px(ctx, L.tv.x + L.tv.w - 6, L.tv.y - 9, (Math.floor(t * 2 + 1) % 2) ? '#ef4444' : '#7f1d1d');
-  // radio on a shelf
+  // the Tapos, mounted high in the living-room corners
+  const lr = L.rooms.living;
+  box(ctx, lr.x + 4, lr.y + 4, 6, 4, C.metalLt, C.outline); px(ctx, lr.x + 6, lr.y + 5, (Math.floor(t * 2) % 2) ? '#ef4444' : '#7f1d1d');
+  box(ctx, lr.x + lr.w - 10, lr.y + 4, 6, 4, C.metalLt, C.outline); px(ctx, lr.x + lr.w - 8, lr.y + 5, (Math.floor(t * 2 + 1) % 2) ? '#ef4444' : '#7f1d1d');
+  // radio on a shelf above the couch
   const r = L.radio;
-  rect(ctx, r.x - 4, r.shelfY, r.w + 8, 2, C.wood); rect(ctx, r.x - 2, r.shelfY + 2, 2, 2, C.woodDk); rect(ctx, r.x + r.w, r.shelfY + 2, 2, 2, C.woodDk);
-  box(ctx, r.x, r.y, r.w, r.h, '#92400e', C.outline, '#d97706', '#78350f');
-  rect(ctx, r.x + 2, r.y + 2, 10, 6, '#1f2937'); for (let x = r.x + 3; x < r.x + 11; x += 2) px(ctx, x, r.y + 5, '#6b7280');
-  disc(ctx, r.x + 17, r.y + 5, 2, C.metalLt);
-  rect(ctx, r.x + r.w - 3, r.y - 8, 1, 8, C.metalLt);
+  const radSize = propSize('radio');
+  const radW = radSize ? radSize.w : r.w;
+  rect(ctx, r.x - 4, r.shelfY, radW + 8, 2, C.wood); rect(ctx, r.x - 2, r.shelfY + 2, 2, 2, C.woodDk); rect(ctx, r.x + radW, r.shelfY + 2, 2, 2, C.woodDk);
+  const radH = drawPropBottom(ctx, 'radio', r.x, r.shelfY);
+  const radTop = radH ? r.shelfY - radH : r.y;
+  if (!radH) {
+    box(ctx, r.x, r.y, r.w, r.h, '#92400e', C.outline, '#d97706', '#78350f');
+    rect(ctx, r.x + 2, r.y + 2, 10, 6, '#1f2937'); for (let x = r.x + 3; x < r.x + 11; x += 2) px(ctx, x, r.y + 5, '#6b7280');
+    disc(ctx, r.x + 17, r.y + 5, 2, C.metalLt);
+    rect(ctx, r.x + r.w - 3, r.y - 8, 1, 8, C.metalLt);
+  }
   const planes = Number(s.sdr.planes || 0);
   if (planes > 0 || anim.radioPing > 0) {
     const k = (t * 1.2) % 1;
+    // pings fan out from the antenna tip (top-left of the sprite, top-right of the hand-drawn one) and stay under the ceiling
+    const ax = radH ? r.x + 3 : r.x + r.w - 3, ay = radH ? radTop + 1 : r.y - 8;
+    const ceiling = lr.y + 1;
     for (let i = 0; i < 2; i++) {
       const rr = 2 + ((k + i * 0.5) % 1) * 6;
-      for (let a = -1.1; a <= 1.1; a += 0.25) px(ctx, r.x + r.w - 3 + Math.cos(a - Math.PI / 2) * rr, r.y - 8 + Math.sin(a - Math.PI / 2) * rr, '#86efac');
+      for (let a = -1.1; a <= 1.1; a += 0.25) { const py = ay + Math.sin(a - Math.PI / 2) * rr; if (py >= ceiling) px(ctx, ax + Math.cos(a - Math.PI / 2) * rr, py, '#86efac'); }
     }
   }
   // crew photo
   drawCrewPhoto(ctx, s);
   // TV + stand
   const st = L.tvStand;
-  box(ctx, st.x, st.y, st.w, st.h, C.wood, C.outline, C.woodLt, C.woodDk);
-  rect(ctx, st.x + 4, st.y + 4, 16, 10, C.woodDk); rect(ctx, st.x + 28, st.y + 4, 16, 10, C.woodDk);
-  px(ctx, st.x + 11, st.y + 9, '#fde68a'); px(ctx, st.x + 35, st.y + 9, '#fde68a');
+  const stH = drawPropBottom(ctx, 'tvstand', st.x, L.feet.lower);
+  if (!stH) {
+    box(ctx, st.x, st.y, st.w, st.h, C.wood, C.outline, C.woodLt, C.woodDk);
+    rect(ctx, st.x + 4, st.y + 4, 16, 10, C.woodDk); rect(ctx, st.x + 28, st.y + 4, 16, 10, C.woodDk);
+    px(ctx, st.x + 11, st.y + 9, '#fde68a'); px(ctx, st.x + 35, st.y + 9, '#fde68a');
+  }
+  L.tv.y = (stH ? L.feet.lower - stH : st.y) - L.tv.h - 2;
   drawTV(ctx, store, t, anim);
   // couch
   const c = L.couch;
-  rect(ctx, c.x + 2, c.y, c.w - 4, 14, '#b91c1c'); // back
-  rect(ctx, c.x, c.seatY, c.w, 10, '#dc2626'); // seat
-  rect(ctx, c.x, c.seatY - 6, 6, 16, '#991b1b'); rect(ctx, c.x + c.w - 6, c.seatY - 6, 6, 16, '#991b1b'); // arms
-  hline(ctx, c.x + 6, c.x + c.w - 7, c.seatY, '#f87171');
-  rect(ctx, c.x + 2, c.seatY + 10, 3, 8, C.woodDk); rect(ctx, c.x + c.w - 5, c.seatY + 10, 3, 8, C.woodDk);
-  outline(ctx, c.x + 2, c.y, c.w - 4, 14, '#7f1d1d');
-  rect(ctx, c.x + 8, c.y + 4, 12, 8, '#fbbf24'); // cushion
+  const coH = drawPropBottom(ctx, 'couch', c.x, L.feet.lower);
+  if (coH) c.seatY = L.feet.lower - Math.round(coH * L.gen.couchSeatFrac);
+  else {
+    rect(ctx, c.x + 2, c.y, c.w - 4, 14, '#b91c1c');
+    rect(ctx, c.x, c.seatY, c.w, 10, '#dc2626');
+    rect(ctx, c.x, c.seatY - 6, 6, 16, '#991b1b'); rect(ctx, c.x + c.w - 6, c.seatY - 6, 6, 16, '#991b1b');
+    hline(ctx, c.x + 6, c.x + c.w - 7, c.seatY, '#f87171');
+    rect(ctx, c.x + 2, c.seatY + 10, 3, 8, C.woodDk); rect(ctx, c.x + c.w - 5, c.seatY + 10, 3, 8, C.woodDk);
+    outline(ctx, c.x + 2, c.y, c.w - 4, 14, '#7f1d1d');
+    rect(ctx, c.x + 8, c.y + 4, 12, 8, '#fbbf24');
+    c.seatY = 282;
+  }
   // dog bed + bowl
   const d = L.dogBed;
-  box(ctx, d.x - 2, d.y, d.w + 4, d.h, '#6d28d9', C.outline, '#8b5cf6');
-  rect(ctx, d.x, d.y + 2, d.w, 4, '#a78bfa');
+  if (!drawPropBottom(ctx, 'dogbed', d.x - 3, L.feet.lower)) {
+    box(ctx, d.x - 2, d.y, d.w + 4, d.h, '#6d28d9', C.outline, '#8b5cf6');
+    rect(ctx, d.x, d.y + 2, d.w, 4, '#a78bfa');
+  }
   const bw = L.dogBowl;
   rect(ctx, bw.x, bw.y + 1, 8, 3, '#dc2626'); rect(ctx, bw.x + 1, bw.y, 6, 1, '#dc2626'); outline(ctx, bw.x, bw.y, 8, 4, '#7f1d1d');
   const fill = clamp(anim.bowlFill || 0, 0, 1);
@@ -615,18 +690,18 @@ export function drawBigPlant(ctx, store, t, anim) {
   if (anim.plantSparkle > 0 && Math.floor(t * 6) % 2 === 0) { px(ctx, p.x + 4, p.y - 24, '#bbf7d0'); px(ctx, p.x + p.w - 4, p.y - 30, '#bbf7d0'); px(ctx, cx, p.y - 60 + droop, '#ffffff'); }
   // stems
   rect(ctx, cx - 1, p.y - 54 + droop, 2, 36 - droop, g3);
-  line(ctx, cx, p.y - 36, cx - 9, p.y - 46 + droop, g3);
-  line(ctx, cx, p.y - 40, cx + 9, p.y - 50 + droop, g3);
+  line(ctx, cx, p.y - 36, cx - 7, p.y - 46 + droop, g3);
+  line(ctx, cx, p.y - 40, cx + 7, p.y - 50 + droop, g3);
   // leaves: big drooping ovals
   const leaf = (x, y, w, h, col) => { for (let yy = 0; yy < h; yy++) { const k = yy / (h - 1); const ww = Math.round(w * Math.sin(Math.PI * (0.1 + 0.8 * k))); rect(ctx, x - Math.floor(ww / 2), y + yy, ww, 1, col); } };
-  leaf(cx - 10, p.y - 52 + droop, 10, 7, g1);
-  leaf(cx + 10, p.y - 56 + droop, 10, 7, g1);
-  leaf(cx - 12, p.y - 38 + droop * 2, 12, 8, g2);
-  leaf(cx + 12, p.y - 42 + droop * 2, 12, 8, g2);
+  leaf(cx - 8, p.y - 52 + droop, 8, 7, g1);
+  leaf(cx + 8, p.y - 56 + droop, 8, 7, g1);
+  leaf(cx - 9, p.y - 38 + droop * 2, 10, 8, g2);
+  leaf(cx + 9, p.y - 42 + droop * 2, 10, 8, g2);
   leaf(cx, p.y - 62 + droop, 9, 7, g2);
-  leaf(cx - 5, p.y - 30 + droop * 2, 10, 6, g1);
-  leaf(cx + 6, p.y - 28 + droop * 2, 10, 6, g1);
-  px(ctx, cx - 10, p.y - 49 + droop, g3); px(ctx, cx + 10, p.y - 53 + droop, g3); px(ctx, cx, p.y - 59 + droop, g3);
+  leaf(cx - 4, p.y - 30 + droop * 2, 8, 6, g1);
+  leaf(cx + 5, p.y - 28 + droop * 2, 8, 6, g1);
+  px(ctx, cx - 8, p.y - 49 + droop, g3); px(ctx, cx + 8, p.y - 53 + droop, g3); px(ctx, cx, p.y - 59 + droop, g3);
   if (thirst > 0.6 && Math.floor(t) % 4 === 0) textCentered(ctx, 'THIRSTY', cx, p.y - 70, '#fde68a');
   // the watering can lives next to the pot unless Clawd has it
   if (!anim.canInHand) drawSprite(ctx, WATERING_CAN, L.can.x, L.can.y, { flip: true });
@@ -664,22 +739,22 @@ function drawTV(ctx, store, t, anim) {
     const names = (s.cams.names || ['front', 'side', 'back', 'shed']).slice(0, 4);
     const online = Number(s.cams.online ?? names.length);
     for (let i = 0; i < 4; i++) {
-      const fx = sx + (i % 2) * 23, fy = sy + Math.floor(i / 2) * 16;
+      const fx = sx + (i % 2) * 21, fy = sy + Math.floor(i / 2) * 16;
       if (i < online) {
         ctx.drawImage(camNoise[i], fx, fy);
         // a wandering blob of motion
-        const bx = fx + Math.floor((t * 3 + i * 7) % 19), by = fy + 8 + (i % 2);
+        const bx = fx + Math.floor((t * 3 + i * 7) % 17), by = fy + 8 + (i % 2);
         if (Math.floor(t / 7 + i) % 3 === 0) { rect(ctx, bx, by, 2, 3, '#9ca3af'); }
         if (anim.camHit === i && anim.camLabel) { outline(ctx, bx - 2, by - 2, 6, 7, '#fde047'); }
       } else {
-        rect(ctx, fx, fy, 21, 15, '#111'); text(ctx, 'NOSIG', fx + 1, fy + 5, '#ef4444');
+        rect(ctx, fx, fy, 19, 15, '#111'); text(ctx, 'NOSIG', fx, fy + 5, '#ef4444');
       }
-      rect(ctx, fx, fy + 15, 21, 1, '#0b0b10');
+      rect(ctx, fx, fy + 15, 19, 1, '#0b0b10');
       const nm = (names[i] || `cam${i + 1}`).toUpperCase().slice(0, 5);
-      text(ctx, nm, fx + 1, fy + 1, '#d1fae5');
-      if (Math.floor(t * 2) % 2 === 0 && i < online) px(ctx, fx + 19, fy + 12, '#ef4444');
+      text(ctx, nm, fx, fy + 1, '#d1fae5');
+      if (Math.floor(t * 2) % 2 === 0 && i < online) px(ctx, fx + 17, fy + 12, '#ef4444');
     }
-    rect(ctx, sx + 21, sy, 2, sh, '#0b0b10');
+    rect(ctx, sx + 19, sy, 2, sh, '#0b0b10');
     if (anim.camLabel) {
       const flash = anim.camFlash > 0 && Math.floor(t * 6) % 2 === 0;
       rect(ctx, sx, sy + 13, sw, 7, flash ? '#b91c1c' : '#7f1d1d');
@@ -717,13 +792,25 @@ export function drawOffice(ctx, store, t, anim) {
   drawWhiteboard(ctx, t, anim);
   // chair
   const ch = L.chair;
-  rect(ctx, ch.x, ch.y, 3, 16, '#1f2937'); rect(ctx, ch.x, ch.y + 16, 14, 3, '#1f2937');
-  rect(ctx, ch.x + 6, ch.y + 19, 2, 9, '#374151'); rect(ctx, ch.x + 2, ch.y + 27, 10, 2, '#374151');
+  const chH = drawPropBottom(ctx, 'chair', ch.x - 4, L.feet.lower);
+  if (chH) ch.seatY = L.feet.lower - Math.round(chH * L.gen.chairSeatFrac);
+  else {
+    rect(ctx, ch.x, ch.y, 3, 16, '#1f2937'); rect(ctx, ch.x, ch.y + 16, 14, 3, '#1f2937');
+    rect(ctx, ch.x + 6, ch.y + 19, 2, 9, '#374151'); rect(ctx, ch.x + 2, ch.y + 27, 10, 2, '#374151');
+    ch.seatY = ch.y + 16;
+  }
   // desk
   const d = L.desk;
-  rect(ctx, d.x, d.y, d.w, 3, C.woodLt); rect(ctx, d.x, d.y + 3, d.w, 2, C.woodDk);
-  rect(ctx, d.x + 2, d.y + 5, 3, d.h - 5, C.woodDk); rect(ctx, d.x + d.w - 5, d.y + 5, 3, d.h - 5, C.woodDk);
-  rect(ctx, d.x + d.w - 20, d.y + 5, 15, 12, C.wood); px(ctx, d.x + d.w - 13, d.y + 10, '#fde68a');
+  const dkH = drawPropBottom(ctx, 'desk', d.x, L.feet.lower);
+  const deskTop = dkH ? L.feet.lower - dkH : d.y;
+  if (!dkH) {
+    rect(ctx, d.x, d.y, d.w, 3, C.woodLt); rect(ctx, d.x, d.y + 3, d.w, 2, C.woodDk);
+    rect(ctx, d.x + 2, d.y + 5, 3, d.h - 5, C.woodDk); rect(ctx, d.x + d.w - 5, d.y + 5, 3, d.h - 5, C.woodDk);
+    rect(ctx, d.x + d.w - 20, d.y + 5, 15, 12, C.wood); px(ctx, d.x + d.w - 13, d.y + 10, '#fde68a');
+  }
+  L.monitor.y = deskTop - L.monitor.h - 4;
+  L.keyboard.y = deskTop + 1;
+  L.laptop.y = deskTop - 8;
   // keyboard
   const k = L.keyboard;
   rect(ctx, k.x, k.y, k.w, k.h, '#374151'); for (let x = k.x + 1; x < k.x + k.w - 1; x += 2) px(ctx, x, k.y + 1, anim.typing && (x + Math.floor(t * 12)) % 5 === 0 ? '#fff' : '#9ca3af');
@@ -857,20 +944,26 @@ export function drawGarage(ctx, store, t, anim) {
   drawBattery(ctx, store, t, anim);
   // pegboard + workbench
   const pb = L.pegboard;
-  box(ctx, pb.x, pb.y, pb.w, pb.h, '#8b6b4a', C.outline);
-  for (let y = pb.y + 3; y < pb.y + pb.h - 2; y += 4) for (let x = pb.x + 3; x < pb.x + pb.w - 2; x += 4) px(ctx, x, y, '#6b4f33');
-  // tools: wrench, screwdriver, hammer
-  rect(ctx, pb.x + 4, pb.y + 4, 2, 12, C.metalLt); rect(ctx, pb.x + 3, pb.y + 3, 4, 3, C.metalLt);
-  rect(ctx, pb.x + 11, pb.y + 4, 2, 6, '#ef4444'); rect(ctx, pb.x + 11, pb.y + 10, 2, 8, C.metalLt);
-  rect(ctx, pb.x + 19, pb.y + 4, 8, 4, C.metalDk); rect(ctx, pb.x + 22, pb.y + 8, 2, 10, C.wood);
+  if (!drawProp(ctx, 'pegboard', pb.x, pb.y)) {
+    box(ctx, pb.x, pb.y, pb.w, pb.h, '#8b6b4a', C.outline);
+    for (let y = pb.y + 3; y < pb.y + pb.h - 2; y += 4) for (let x = pb.x + 3; x < pb.x + pb.w - 2; x += 4) px(ctx, x, y, '#6b4f33');
+    rect(ctx, pb.x + 4, pb.y + 4, 2, 12, C.metalLt); rect(ctx, pb.x + 3, pb.y + 3, 4, 3, C.metalLt);
+    rect(ctx, pb.x + 11, pb.y + 4, 2, 6, '#ef4444'); rect(ctx, pb.x + 11, pb.y + 10, 2, 8, C.metalLt);
+    rect(ctx, pb.x + 19, pb.y + 4, 8, 4, C.metalDk); rect(ctx, pb.x + 22, pb.y + 8, 2, 10, C.wood);
+  }
   const wb = L.workbench;
-  rect(ctx, wb.x, wb.y, wb.w, 4, C.woodLt); rect(ctx, wb.x, wb.y + 4, wb.w, 2, C.woodDk);
-  rect(ctx, wb.x + 2, wb.y + 6, 3, wb.h - 6, C.woodDk); rect(ctx, wb.x + wb.w - 5, wb.y + 6, 3, wb.h - 6, C.woodDk);
-  rect(ctx, wb.x + 6, wb.y + 10, wb.w - 12, 2, C.woodDk);
-  // bits on the bench: a script page + a mug
-  rect(ctx, wb.x + 4, wb.y - 6, 8, 6, '#f8fafc'); for (let i = 0; i < 3; i++) hline(ctx, wb.x + 5, wb.x + 10, wb.y - 5 + i * 2, '#94a3b8');
-  box(ctx, wb.x + 20, wb.y - 6, 6, 6, '#3b82f6', C.outline); px(ctx, wb.x + 26, wb.y - 4, '#3b82f6');
-  if (anim.tinkering) { if (Math.floor(t * 6) % 3 === 0) px(ctx, wb.x + 14, wb.y - 2, '#fde68a'); }
+  const wbH = drawPropBottom(ctx, 'workbench', wb.x, L.feet.lower);
+  wb.y = wbH ? L.feet.lower - wbH : 276;
+  if (!wbH) {
+    rect(ctx, wb.x, wb.y, wb.w, 4, C.woodLt); rect(ctx, wb.x, wb.y + 4, wb.w, 2, C.woodDk);
+    rect(ctx, wb.x + 2, wb.y + 6, 3, wb.h - 6, C.woodDk); rect(ctx, wb.x + wb.w - 5, wb.y + 6, 3, wb.h - 6, C.woodDk);
+    rect(ctx, wb.x + 6, wb.y + 10, wb.w - 12, 2, C.woodDk);
+  }
+  // bits on the bench top: a script page + a mug (either side of the vice)
+  const bt = wbH ? wb.y + Math.round(wbH * L.gen.benchTopFrac) : wb.y;
+  rect(ctx, wb.x + 3, bt - 6, 8, 6, '#f8fafc'); for (let i = 0; i < 3; i++) hline(ctx, wb.x + 4, wb.x + 9, bt - 5 + i * 2, '#94a3b8');
+  box(ctx, wb.x + wb.w - 10, bt - 6, 6, 6, '#3b82f6', C.outline); px(ctx, wb.x + wb.w - 4, bt - 4, '#3b82f6');
+  if (anim.tinkering) { if (Math.floor(t * 6) % 3 === 0) px(ctx, wb.x + Math.round(wb.w / 2), bt - 12, '#fde68a'); }
   // broom leaning on the wall
   if (!anim.broomInHand) drawBroom(ctx, L.broom.x, L.broom.y, 1);
   // bot docks
@@ -907,6 +1000,26 @@ function drawBattery(ctx, store, t, anim) {
 }
 
 // ----------------------------------------------------------------- loft + props
+// The lower part of the bed sprite, drawn again over Clawd so he is tucked in. Returns false
+// when the bed is hand-drawn (the caller then draws its own blanket).
+export function drawBedBlanket(ctx) {
+  const img = propImage('bed');
+  if (!img) return false;
+  const h = img.naturalHeight, w = img.naturalWidth;
+  const top = L.feet.upper - h;
+  const from = Math.round(h * L.gen.bedBlanketFrac);
+  ctx.drawImage(img, 0, from, w, h - from, L.bed.x, top + from, w, h - from);
+  return true;
+}
+
+// Where Clawd sits up in bed: the top-left of his body sprite.
+export function bedSleepPos() {
+  const img = propImage('bed');
+  if (!img) return { x: L.bed.x + 14, y: L.bed.y + 5 };
+  const h = img.naturalHeight, top = L.feet.upper - h;
+  return { x: L.bed.x + L.gen.bedSleepX, y: top + Math.round(h * L.gen.bedSleepYFrac) };
+}
+
 export function drawBroom(ctx, x, y, lean = 0) {
   // handle 26 tall, bristles at the bottom
   for (let i = 0; i < 26; i++) px(ctx, x + Math.round(i * lean * 0.12), y + i, C.woodLt);
@@ -947,13 +1060,15 @@ export function drawLoft(ctx, store, t, anim) {
   rect(ctx, cr.x + 2, cr.y + 2, cr.w - 4, 1, '#78350f'); rect(ctx, cr.x + 2, cr.y + cr.h - 3, cr.w - 4, 1, '#78350f');
   const tvSize = propSize('crt');
   const tvTop = tvSize ? cr.y - tvSize.h : tv.y;
-  const hasCrt = drawPropBottom(ctx, 'crt', tv.x, cr.y) > 0;
+  const crtX = tvSize ? cr.x + Math.round((cr.w - tvSize.w) / 2) : tv.x;
+  const hasCrt = drawPropBottom(ctx, 'crt', crtX, cr.y) > 0;
   if (!hasCrt) box(ctx, tv.x, tv.y, tv.w, tv.h, '#cbd5e1', C.outline, '#f1f5f9', '#94a3b8');
   const conSize = propSize('console');
   if (conSize) drawPropBottom(ctx, 'console', cr.x + Math.round((cr.w - conSize.w) / 2), L.feet.loft);
   // the game on the screen: the screen is the middle of the TV face
-  const scx = hasCrt ? tv.x + Math.round(tvSize.w * 0.22) : tv.x + 3, scy = hasCrt ? tvTop + Math.round(tvSize.h * 0.2) : tv.y + 3;
-  const scw = hasCrt ? Math.round(tvSize.w * 0.56) : tv.w - 8, sch = hasCrt ? Math.round(tvSize.h * 0.42) : tv.h - 6;
+  const cs = L.gen.crtScreen;
+  const scx = hasCrt ? crtX + Math.round(tvSize.w * cs.x) : tv.x + 3, scy = hasCrt ? tvTop + Math.round(tvSize.h * cs.y) : tv.y + 3;
+  const scw = hasCrt ? Math.round(tvSize.w * cs.w) : tv.w - 8, sch = hasCrt ? Math.round(tvSize.h * cs.h) : tv.h - 6;
   if (anim.retroOn) {
     rect(ctx, scx, scy, scw, sch, '#0f172a');
     const k = Math.floor(t * 2);
@@ -1104,13 +1219,13 @@ export const ITEMS = [
   { id: 'whiteboard', rect: [L.whiteboard.x - 2, L.whiteboard.y - 2, L.whiteboard.w + 4, L.whiteboard.h + 6], title: 'Whiteboard', body: 'Where I plan things out. Boxes and arrows, mostly.', stats: () => ({}) },
   { id: 'bowl', rect: [L.dogBowl.x - 3, L.dogBowl.y - 6, 14, 10], title: "The dog's bowl", body: 'Kept topped up. He eats when nothing is on fire.', stats: () => ({}) },
   { id: 'chimney', spark: ['cpu', 'temp'], rect: [L.chimney.x - 2, L.chimney.y - 14, 16, 40], title: 'Chimney', body: 'Smoke means the CPU is working hard.', stats: (s) => ({ cpu: `${s.system.cpu}%`, temp: `${s.system.temp}°C` }) },
-  { id: 'mailbox', rect: [0, 258, 22, 46], title: 'Mailbox', body: 'Your Telegram DMs. The flag goes up when something is waiting for me.', stats: (s) => ({ unread: s.telegram.unread, last: s.telegram.last ? `${s.telegram.last.from}: ${s.telegram.last.text}` : '—' }) },
+  { id: 'mailbox', rect: () => { const sz = propSize('mailbox'); return sz ? [L.mailbox.x - 6, L.groundY - sz.h - 10, sz.w + 6, sz.h + 12] : [0, 258, 22, 46]; }, title: 'Mailbox', body: 'Your Telegram DMs. The flag goes up when something is waiting for me.', stats: (s) => ({ unread: s.telegram.unread, last: s.telegram.last ? `${s.telegram.last.from}: ${s.telegram.last.text}` : '—' }) },
   { id: 'bird', rect: [L.tree.x - 22, L.tree.canopyY - 22, 50, 64], title: 'Chirpa', body: 'The bird-audio listener. Sings whenever one of the ~79 species is heard in the yard.', stats: (s) => ({ 'species today': s.chirpa.species_today, detections: s.chirpa.detections_today, last: s.chirpa.last ? s.chirpa.last.species : '—' }) },
-  { id: 'door', rect: [L.frontDoor.x - 4, L.frontDoor.y - 4, 20, 36], title: 'Front door', body: 'Where the crew bus pulls up and where messages land on the doorstep.', stats: (s) => ({ 'on the bus': (s.bus.online || []).join(', ') || 'nobody', 'messages today': s.bus.messages_today }) },
-  { id: 'dog', rect: [L.dogBed.x - 4, L.dogBed.y - 16, 30, 26], title: 'The watchdog', body: 'clawd-watchdog. Loyal, mostly asleep, barks the moment a disk fills, RAM runs out or the gateway dies.', stats: (s) => ({ state: s.watchdog.state, alerts: (s.watchdog.alerts || []).join(', ') || 'none', 'last bark': fmtAgo(s.watchdog.last_bark) }) },
-  { id: 'plant2', rect: [L.bigPlant.x - 4, L.bigPlant.y - 74, L.bigPlant.w + 16, 76], title: 'The plant', body: 'Watered every sunrise and sunset. It droops when it has gone without a drink, and perks up after one.', stats: (s, store) => ({ 'last watered': fmtAgo(store.plants?.lastWatered), 'next watering': store.nextWatering(), sunrise: s.weather?.sunrise || '06:30', sunset: s.weather?.sunset || '18:30', 'feeling': plantThirst(store) > 0.6 ? 'thirsty' : plantThirst(store) > 0.25 ? 'could do with a drink' : 'fresh' }) },
-  { id: 'radio', rect: [L.radio.x - 6, L.radio.y - 12, 34, 30], title: 'Radio', body: 'The RTL-SDR: ADS-B planes overhead and 433MHz sensor chatter.', stats: (s) => ({ planes: s.sdr.planes, sensors: s.sdr.sensors, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign} ${s.sdr.last_plane.alt ? s.sdr.last_plane.alt + 'ft' : ''}` : '—' }) },
-  { id: 'tv', rect: [L.tv.x - 2, L.tv.y - 12, L.tv.w + 4, L.tv.h + 34], title: 'TV and the cameras', body: 'Live feeds: the Frigate cams (3 Tapos + shed) on one channel, the homelab dashboard on another. Flashes when Frigate spots something.', stats: (s) => ({ cams: `${s.cams.online}/${(s.cams.names || []).length} online`, 'events today': s.cams.events_today, last: s.cams.last ? `${s.cams.last.label} @ ${s.cams.last.camera}` : '—' }) },
+  { id: 'door', rect: () => [L.frontDoor.x - 2, L.frontDoor.y - 2, L.frontDoor.w + 4, L.frontDoor.h + 4], title: 'Front door', body: 'Where the crew bus pulls up and where messages land on the doorstep.', stats: (s) => ({ 'on the bus': (s.bus.online || []).join(', ') || 'nobody', 'messages today': s.bus.messages_today }) },
+  { id: 'dog', rect: [L.dogBed.x - 4, L.dogBed.y - 18, L.dogBed.w + 8, 30], title: 'The watchdog', body: 'clawd-watchdog. Loyal, mostly asleep, barks the moment a disk fills, RAM runs out or the gateway dies.', stats: (s) => ({ state: s.watchdog.state, alerts: (s.watchdog.alerts || []).join(', ') || 'none', 'last bark': fmtAgo(s.watchdog.last_bark) }) },
+  { id: 'plant2', rect: [L.bigPlant.x - 6, L.bigPlant.y - 74, L.bigPlant.w + 12, 76], title: 'The plant', body: 'Watered every sunrise and sunset. It droops when it has gone without a drink, and perks up after one.', stats: (s, store) => ({ 'last watered': fmtAgo(store.plants?.lastWatered), 'next watering': store.nextWatering(), sunrise: s.weather?.sunrise || '06:30', sunset: s.weather?.sunset || '18:30', 'feeling': plantThirst(store) > 0.6 ? 'thirsty' : plantThirst(store) > 0.25 ? 'could do with a drink' : 'fresh' }) },
+  { id: 'radio', rect: () => { const sz = propSize('radio'); const w = sz ? sz.w : L.radio.w, h = sz ? sz.h : L.radio.h + 8; return [L.radio.x - 4, L.radio.shelfY - h - 2, w + 8, h + 6]; }, title: 'Radio', body: 'The RTL-SDR: ADS-B planes overhead and 433MHz sensor chatter.', stats: (s) => ({ planes: s.sdr.planes, sensors: s.sdr.sensors, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign} ${s.sdr.last_plane.alt ? s.sdr.last_plane.alt + 'ft' : ''}` : '—' }) },
+  { id: 'tv', rect: () => [L.tv.x - 2, L.tv.y - 2, L.tv.w + 4, L.feet.lower - L.tv.y + 2], title: 'TV and the cameras', body: 'Live feeds: the Frigate cams (3 Tapos + shed) on one channel, the homelab dashboard on another. Flashes when Frigate spots something.', stats: (s) => ({ cams: `${s.cams.online}/${(s.cams.names || []).length} online`, 'events today': s.cams.events_today, last: s.cams.last ? `${s.cams.last.label} @ ${s.cams.last.camera}` : '—' }) },
   { id: 'crew', rect: [L.crewPhoto.x - 2, L.crewPhoto.y - 2, L.crewPhoto.w + 4, L.crewPhoto.h + 4], title: 'The crew photo', body: 'All of us. Bright when they are online, grey when they are away.', stats: (s) => Object.fromEntries(Object.entries(s.crew || {}).map(([k, v]) => [`${v.emoji || ''} ${k}`, v.online === false ? 'away' : 'home'])) },
   { id: 'couch', rect: [L.couch.x, L.couch.y - 4, L.couch.w, 36], title: 'Couch', body: 'Where I sit to watch the yard.', stats: () => ({}) },
   { id: 'bed', rect: [L.bed.x - 2, L.bed.y - 2, L.bed.w + 4, 40], title: 'Bed', body: 'Idle means asleep means dreaming: memory consolidation and the nightly diary.', stats: (s) => ({ 'last diary': fmtAgo(s.memory.last_diary), consolidated: fmtAgo(s.memory.last_consolidation), dreaming: s.clawd.dream || '—' }) },
@@ -1130,9 +1245,11 @@ export const ITEMS = [
   { id: 'www', rect: [L.signpost.x - 10, 256, 24, 48], title: 'The road out', body: 'The internet: web search and the browser. How I wander outside.', stats: (s) => ({ wan: s.network.wan ? 'up' : 'down', latency: `${s.network.latency_ms} ms`, devices: s.network.devices }) },
 ];
 
+export function itemRect(it) { return typeof it.rect === 'function' ? it.rect() : it.rect; }
+
 export function drawHighlight(ctx, rect, t) {
   if (!rect) return;
-  const [x, y, w, h] = rect;
+  const [x, y, w, h] = typeof rect === 'function' ? rect() : rect;
   const on = Math.floor(t * 4) % 2 === 0;
   outline(ctx, x - 1, y - 1, w + 2, h + 2, on ? '#fde047' : '#ffffff');
   px(ctx, x - 1, y - 1, '#fde047'); px(ctx, x + w, y - 1, '#fde047'); px(ctx, x - 1, y + h, '#fde047'); px(ctx, x + w, y + h, '#fde047');
@@ -1142,7 +1259,7 @@ export function hitTest(x, y, extra = []) {
   // smallest matching rect wins
   let best = null;
   for (const it of [...extra, ...ITEMS]) {
-    const [rx, ry, rw, rh] = it.rect;
+    const [rx, ry, rw, rh] = typeof it.rect === 'function' ? it.rect() : it.rect;
     if (x >= rx && x < rx + rw && y >= ry && y < ry + rh) {
       const area = rw * rh;
       if (!best || area < best.area) best = { item: it, area };

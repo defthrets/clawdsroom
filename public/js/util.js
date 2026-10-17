@@ -151,7 +151,9 @@ export function rasterize(sprite, { flip = false, tint = null } = {}) {
 
 export function drawSprite(ctx, sprite, x, y, opts = {}) {
   const cv = rasterize(sprite, opts);
-  ctx.drawImage(cv, Math.round(x), Math.round(y));
+  const scale = opts.scale || 1;
+  if (scale === 1) ctx.drawImage(cv, Math.round(x), Math.round(y));
+  else { const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, Math.round(x), Math.round(y), cv.width * scale, cv.height * scale); ctx.imageSmoothingEnabled = sm; }
   return cv;
 }
 

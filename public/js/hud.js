@@ -213,7 +213,7 @@ export class Hud {
     const sy = parseFloat(st.getPropertyValue('--sy')) || 0;
     const sw = parseFloat(st.getPropertyValue('--sw')) || 480 * u;
     const sh = parseFloat(st.getPropertyValue('--sh')) || 360 * u;
-    const [rx, ry, rw, rh] = item.rect || [240, 180, 0, 0];
+    const [rx, ry, rw, rh] = (typeof item.rect === 'function' ? item.rect() : item.rect) || [240, 180, 0, 0];
     const cardW = 150 * u;
     const cx = rx + rw / 2;
     let left = cx < 240 ? sx + (rx + rw + 8) * u : sx + (rx - 8) * u - cardW;

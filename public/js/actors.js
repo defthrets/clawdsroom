@@ -1,7 +1,9 @@
 // The living things: Clawd, the watchdog, Chirpa, the helper bots, the crew bus, envelopes,
 // planes and clouds. Also the `anim` flags the scene reads (typing, TV mode, flashes...).
 
-import { L, stairY, roomAt } from './scene.js';
+import { L, stairY, roomAt, drawBedBlanket, bedSleepPos } from './scene.js';
+// Clawd and the dog are drawn at 2x: the house and its furniture are built at that scale.
+export const CLAWD_SCALE = 2;
 import { CLAWD_BODY, CLAWD_WALK_A, CLAWD_WALK_B, CLAWD_SIT, CLAW, DOG_STAND, DOG_SIT, DOG_SLEEP, DOG_BARK, BIRD, BIRD_SING, BOT, BOT_WALK, BOOK, ENVELOPE, EYE_ICON, CREW, WATERING_CAN, HATS, PHONE, MINI_GUITAR } from './sprites.js';
 import { drawSprite, rect, px, disc, text, textCentered, textWidth, bubble, rand, randInt, pick, chance, clamp, lerp, box, outline, fmtDuration } from './util.js';
 import { drawBroom } from './scene.js';
@@ -72,13 +74,13 @@ export const PASTIMES = [
   // living room
   { id: 'plantchat', phrase: 'talking to the plant', go: 'off to see the plant', x: 122, floor: 'lower', face: -1, act: 'check', dur: [5, 10], when: ['morning', 'day'], lines: ['Looking good, mate.', 'Growing nicely.', 'Nearly time for a drink.'] },
   { id: 'tvcheck', phrase: 'checking the cams', go: 'off to check the cams', x: 176, floor: 'lower', face: -1, act: 'lookup', dur: [6, 14], when: ['day', 'evening'], lines: ['Quiet yard.', 'Was that the cat?', 'Bins are out.'] },
-  { id: 'couch', phrase: 'chilling on the couch', go: 'off to the couch', x: 190, floor: 'lower', face: -1, sit: 'couch', dur: [18, 45], when: ['day', 'evening'], lines: ['Telly time.', 'Just chilling.', 'Feet up.'] },
+  { id: 'couch', phrase: 'chilling on the couch', go: 'off to the couch', x: 200, floor: 'lower', face: -1, sit: 'couch', dur: [18, 45], when: ['day', 'evening'], lines: ['Telly time.', 'Just chilling.', 'Feet up.'] },
   { id: 'nap', phrase: 'napping on the couch', go: 'off for a nap', x: 194, floor: 'lower', face: -1, sit: 'couch', act: 'nap', dur: [25, 60], when: ['day', 'evening'], lines: ['Five minutes.'] },
   { id: 'channel', phrase: 'channel hopping', go: 'off to the couch', x: 190, floor: 'lower', face: -1, sit: 'couch', act: 'channel', dur: [10, 20], when: ['evening'], lines: ['Nothing on.', 'Cams, dash, cams, dash.'] },
   { id: 'cushions', phrase: 'plumping the cushions', go: 'off to tidy the couch', x: 168, floor: 'lower', face: 1, act: 'tidy', dur: [4, 7], when: ['morning', 'day'], lines: ['There we go.'] },
-  { id: 'dust', phrase: 'dusting the crew photo', go: 'off to dust the crew photo', x: 168, floor: 'lower', face: 1, act: 'tidyup', dur: [4, 8], when: ['day', 'evening'], lines: ['Good crew, that.', 'Miss you lot.'] },
+  { id: 'dust', phrase: 'dusting the crew photo', go: 'off to dust the crew photo', x: 150, floor: 'lower', face: 1, act: 'tidyup', dur: [4, 8], when: ['day', 'evening'], lines: ['Good crew, that.', 'Miss you lot.'] },
   { id: 'crew', phrase: 'looking at the crew photo', go: 'off to see the crew', x: 168, floor: 'lower', face: 1, act: 'lookup', dur: [4, 8], when: ['evening'], lines: ['Look at us.'] },
-  { id: 'radio', phrase: 'listening to the radio', go: 'off to the radio', x: 108, floor: 'lower', face: 1, act: 'radio', dur: [6, 12], when: ['morning', 'evening'], lines: ['...static...', 'Planes up tonight.', 'Shed sensor again.'] },
+  { id: 'radio', phrase: 'listening to the radio', go: 'off to the radio', x: 178, floor: 'lower', face: 1, act: 'radio', dur: [6, 12], when: ['morning', 'evening'], lines: ['...static...', 'Planes up tonight.', 'Shed sensor again.'] },
   { id: 'dog', phrase: 'petting the dog', go: 'off to see the dog', x: 252, floor: 'lower', face: 1, act: 'pet', dur: [5, 10], when: ['morning', 'day', 'evening'], lines: ['Good dog.', "Who's a good watchdog?", 'Anything to report?'] },
   { id: 'feed', phrase: 'feeding the dog', go: 'off to feed the dog', x: 300, floor: 'lower', face: -1, act: 'feed', dur: [8, 12], when: ['morning', 'evening'], lines: ['Dinner time.', 'Here you go, boy.'] },
   { id: 'door', phrase: 'answering the door', go: 'off to the door', x: 94, floor: 'lower', face: -1, act: 'check', dur: [5, 9], when: [], lines: [], forcedOnly: true },
@@ -110,7 +112,7 @@ export const PASTIMES = [
   { id: 'boxes', phrase: 'rummaging through the downloads', go: 'off to the garage shelves', x: 404, floor: 'lower', face: 1, act: 'rummage', dur: [6, 12], when: ['day'], lines: ['What is all this?', 'Old downloads.', 'Ooh, forgot about this.'] },
   // outside
   { id: 'mailbox', phrase: 'checking the post', go: 'off to check the post', x: 26, floor: 'outside', face: -1, act: 'mail', dur: [4, 8], when: ['morning', 'day'], lines: ['MAIL'] },
-  { id: 'tree', phrase: 'chatting to Chirpa', go: 'off out to see Chirpa', x: 54, floor: 'outside', face: -1, act: 'lookup', dur: [5, 12], when: ['morning', 'day'], lines: ['Alright, Chirpa?', 'Sing us one.', 'Any good ones today?'] },
+  { id: 'tree', phrase: 'chatting to Chirpa', go: 'off out to see Chirpa', x: 40, floor: 'outside', face: 1, act: 'lookup', dur: [5, 12], when: ['morning', 'day'], lines: ['Alright, Chirpa?', 'Sing us one.', 'Any good ones today?'] },
   // anywhere
   { id: 'dance', phrase: 'having a little dance', act: 'dance', dur: [4, 7], when: ['day', 'evening'], lines: ['Tune!', '♪ ♪'] },
   { id: 'stretch', phrase: 'stretching', act: 'stretch', dur: [2, 4], when: ['morning', 'day', 'evening', 'night'], lines: [] },
@@ -144,8 +146,8 @@ function planPath(from, to) {
     cur = { x: L.stairs.x, floor: 'lower' };
   } else if (cur.floor === 'outside') {
     if (cur.x > 400) pts.push({ x: 462, floor: 'outside' }, { x: 454, floor: 'lower' });
-    else pts.push({ x: 64, floor: 'outside' }, { x: 80, floor: 'lower' });
-    cur = { x: cur.x > 400 ? 454 : 80, floor: 'lower' };
+    else pts.push({ x: 64, floor: 'outside' }, { x: 88, floor: 'lower' });
+    cur = { x: cur.x > 400 ? 454 : 88, floor: 'lower' };
   }
   if (to.floor === 'lower') pts.push(to);
   else if (to.floor === 'upper') pts.push({ x: L.stairs.x, floor: 'lower' }, { x: L.stairs.x + L.stairs.w + 2, floor: 'upper', stairs: true }, to);
@@ -376,7 +378,7 @@ export class Actors {
             const from = feetY(c.floor), to = feetY(wp.floor);
             c.y = lerp(from, to, clamp(1 - Math.abs(dx) / 8, 0, 1));
           } else c.y = feetY(c.floor);
-          if (a.broomInHand && Math.floor(c.walkT * 6) !== Math.floor((c.walkT + dt) * 6)) this.fx.add({ x: c.x - c.face * 10 + randInt(-3, 3), y: c.y - 1, life: 0.6, vx: -c.face * 6, vy: -5, draw: (g, q) => px(g, q.x, q.y, '#a8a29e') });
+          if (a.broomInHand && Math.floor(c.walkT * 6) !== Math.floor((c.walkT + dt) * 6)) this.fx.add({ x: c.x - c.face * 18 + randInt(-3, 3), y: c.y - 1, life: 0.6, vx: -c.face * 6, vy: -5, draw: (g, q) => px(g, q.x, q.y, '#a8a29e') });
         }
       }
       c.moving = true;
@@ -489,13 +491,13 @@ export class Actors {
     if (ch.phase === 'go') { ch.phase = 'water'; ch.t = 5; this.anim.canInHand = true; }
     ch.t -= dt;
     c.watering = true;
-    const target = ch.step === 0 ? { x: L.bigPlant.x + L.bigPlant.w / 2, y: L.bigPlant.y - 56 } : { x: L.plant.x + 7, y: L.plant.y - 2 };
+    const target = ch.step === 0 ? { x: L.bigPlant.x + L.bigPlant.w / 2, y: L.bigPlant.y - 56 } : { x: L.plant.x + 15, y: L.feet.upper - 30 };
     if (Math.floor(ch.t / 0.2) !== Math.floor((ch.t + dt) / 0.2)) this.fx.add({ x: target.x + randInt(-6, 6), y: target.y, life: 0.45, vy: 34, draw: (g, q) => px(g, q.x, q.y, '#60a5fa') });
     if (ch.t > 0) return;
     this.anim.plantSparkle = 3;
     if (ch.step === 0) {
       ch.step = 1; ch.phase = 'go';
-      this.walkTo(L.plant.x - 12, 'upper', { face: 1 });
+      this.walkTo(L.plant.x - 10, 'upper', { face: 1 });
     } else {
       this.store.markWatered(ch.key);
       c.chore = null;
@@ -594,8 +596,8 @@ export class Actors {
     const tick = (every) => Math.floor(p.t / every) !== Math.floor((p.t + dt) / every);
     switch (p.def.act) {
       case 'lookup': c.lookUp = 0.5; break;
-      case 'nap': c.napping = true; if (tick(2.5)) this.fx.zzz(c.x + 6, c.y - 30); break;
-      case 'swing': if (chance(0.002)) c.napping = true; if (tick(4)) this.fx.add({ x: c.x - 10, y: c.y - 28, life: 1.2, vx: 8, vy: -6, draw: (g, q) => text(g, '~', q.x, q.y, '#fde68a') }); break;
+      case 'nap': c.napping = true; if (tick(2.5)) this.fx.zzz(c.x + 6, c.y - 38); break;
+      case 'swing': if (chance(0.002)) c.napping = true; if (tick(4)) this.fx.add({ x: c.x - 10, y: c.y - 36, life: 1.2, vx: 8, vy: -6, draw: (g, q) => text(g, '~', q.x, q.y, '#fde68a') }); break;
       case 'pet': c.petting = true; this.dog.alertT = 0.6; if (tick(0.8)) this.fx.heart(L.dogBed.x + randInt(2, 16), L.dogBed.y - 8); break;
       case 'feed':
         if (p.pourT > 0) { p.pourT -= dt; c.watering = true; this.bowl.fill = Math.min(1, this.bowl.fill + dt / 2); if (tick(0.15)) this.fx.add({ x: L.dogBowl.x + randInt(1, 6), y: L.dogBowl.y - 10, life: 0.3, vy: 36, draw: (g, q) => px(g, q.x, q.y, '#a16207') }); }
@@ -603,10 +605,10 @@ export class Actors {
         break;
       case 'browse': a.bookOut = 1; break;
       case 'radio': a.radioPing = 1; if (tick(0.6)) this.fx.note(L.radio.x + randInt(0, 18), L.radio.y - 4); break;
-      case 'dance': c.dance = Math.max(c.dance, 0.2); if (tick(0.5)) this.fx.note(c.x + randInt(-6, 10), c.y - 22); break;
+      case 'dance': c.dance = Math.max(c.dance, 0.2); if (tick(0.5)) this.fx.note(c.x + randInt(-6, 10), c.y - 36); break;
       case 'stretch': c.stretch = Math.max(c.stretch, 0.2); break;
       case 'game': a.retroOn = true; c.phone = false; if (tick(6) && chance(0.4)) this.fx.label(L.crt.x + L.crt.w / 2, L.crt.y - 16, pick(['NICE', 'OOF', '1UP', 'GG']), { life: 1.5, rise: 4, bg: '#1e1b4b' }); break;
-      case 'guitar': c.guitar = true; a.guitarAway = true; if (tick(0.7)) this.fx.note(c.x + randInt(-8, 8), c.y - 24); break;
+      case 'guitar': c.guitar = true; a.guitarAway = true; if (tick(0.7)) this.fx.note(c.x + randInt(-8, 8), c.y - 36); break;
       case 'record': a.recordOn = true; c.headphones = true; if (tick(0.8)) this.fx.note(L.recordPlayer.x + randInt(2, 16), L.recordPlayer.y - 12); break;
       case 'punch':
         if (tick(0.55)) { c.punching = 0.25; a.punch = 0.5; this.fx.add({ x: L.punchbag.x + 14, y: L.punchbag.y + randInt(6, 18), life: 0.35, draw: (g, q, k) => { if (k < 0.7) text(g, 'POW', q.x - 8, q.y - 2 - k * 4, '#fde047'); } }); }
@@ -809,15 +811,16 @@ export class Actors {
 
   drawDog(ctx) {
     const d = this.dog;
-    const x = L.dogBed.x - 1;
-    if (d.state === 'sleep') drawSprite(ctx, DOG_SLEEP, x, L.feet.lower - 7);
+    const S = CLAWD_SCALE;
+    const x = L.dogBed.x + Math.round((L.dogBed.w - 16 * S) / 2);
+    if (d.state === 'sleep') drawSprite(ctx, DOG_SLEEP, x, L.feet.lower - 7 * S, { scale: S });
     else if (d.state === 'sit') {
-      drawSprite(ctx, DOG_SIT, x, L.feet.lower - 11);
+      drawSprite(ctx, DOG_SIT, x, L.feet.lower - 11 * S, { scale: S });
       if (d.eating > 0 && Math.floor(this.t * 6) % 2 === 0) px(ctx, L.dogBowl.x + 3 + (Math.floor(this.t * 6) % 3), L.dogBowl.y - 1, '#a16207');
     } else {
       const sp = Math.floor(this.t * 6) % 2 === 0 ? DOG_BARK : DOG_STAND;
-      drawSprite(ctx, sp, x, L.feet.lower - 11);
-      if (d.reason) this.late.push((g) => bubble(g, `WOOF! ${d.reason}`, x + 8, L.feet.lower - 12, { bg: '#fef3c7', color: '#7c2d12' }));
+      drawSprite(ctx, sp, x, L.feet.lower - 11 * S, { scale: S });
+      if (d.reason) this.late.push((g) => bubble(g, `WOOF! ${d.reason}`, x + 8 * S, L.feet.lower - 12 * S, { bg: '#fef3c7', color: '#7c2d12' }));
     }
   }
 
@@ -877,52 +880,74 @@ export class Actors {
     let bx, by, body;
     const face = c.face;
     if (c.pose === 'bed') {
-      bx = L.bed.x + 14; by = L.bed.y + 5;
+      const sp = bedSleepPos();
+      bx = sp.x; by = sp.y;
+      const BX = sp.x, BY = sp.y;
+      const X = (x) => BX + (x - bx) * CLAWD_SCALE, Y = (y) => BY + (y - by) * CLAWD_SCALE;
       body = CLAWD_SIT;
-      drawSprite(ctx, body, bx, by);
-      this.drawFace(ctx, bx, by, 1, true);
-      rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 11, '#2563eb');
-      for (let x = L.bed.x + 24; x < L.bed.x + L.bed.w - 2; x += 6) rect(ctx, x, L.bed.y + 20, 3, 1, '#60a5fa');
-      rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 1, '#93c5fd');
-      drawSprite(ctx, CLAW, bx - 2, by + 9, { flip: true }); drawSprite(ctx, CLAW, bx + 15, by + 9);
-      if (c.thought) this.late.push((g) => bubble(g, c.thought.text, bx + 8, by - 2, { thought: true, bg: '#eef2ff' }));
-      if (c.alert > 0) this.late.push((g) => text(g, '!', bx + 7, by - 8, '#fbbf24', 2));
-      c.rect = [bx - 4, by - 6, 24, 26];
+      this.scaled(ctx, bx, by, BX, BY, () => { drawSprite(ctx, body, bx, by); this.drawFace(ctx, bx, by, 1, true); });
+      if (!drawBedBlanket(ctx)) {
+        rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 11, '#2563eb');
+        for (let x = L.bed.x + 24; x < L.bed.x + L.bed.w - 2; x += 6) rect(ctx, x, L.bed.y + 20, 3, 1, '#60a5fa');
+        rect(ctx, L.bed.x + 22, L.bed.y + 18, L.bed.w - 22, 1, '#93c5fd');
+      }
+      this.scaled(ctx, bx, by, BX, BY, () => { drawSprite(ctx, CLAW, bx - 2, by + 9, { flip: true }); drawSprite(ctx, CLAW, bx + 15, by + 9); });
+      if (c.thought) this.late.push((g) => bubble(g, c.thought.text, X(bx + 8), Y(by - 2), { thought: true, bg: '#eef2ff' }));
+      if (c.alert > 0) this.late.push((g) => text(g, '!', X(bx + 7), Y(by - 8), '#fbbf24', 2));
+      c.rect = [BX - 4, BY - 6, 16 * CLAWD_SCALE + 8, 15 * CLAWD_SCALE + 6];
       return;
     }
     const bob = c.dance > 0 && !c.moving ? (Math.floor(t * 6) % 2 ? -1 : 0) : (c.pose === 'hammock' ? Math.round(Math.sin(t * 1.5)) : 0);
     if (['chair', 'couch', 'bedsit', 'beanbag', 'hammock'].includes(c.pose)) {
-      const seat = c.pose === 'chair' ? L.chair.y + 16 : c.pose === 'couch' ? L.couch.seatY : c.pose === 'beanbag' ? L.beanbag.seatY : c.pose === 'hammock' ? L.hammock.seatY : 170;
+      const seat = c.pose === 'chair' ? L.chair.seatY : c.pose === 'couch' ? L.couch.seatY : c.pose === 'beanbag' ? L.beanbag.seatY : c.pose === 'hammock' ? L.hammock.seatY : 170;
       bx = Math.round(c.x - 8); by = seat - 14 + bob;
       body = CLAWD_SIT;
     } else {
       bx = Math.round(c.x - 8); by = Math.round(c.y - 17) + bob;
       body = c.moving ? (Math.floor(c.walkT * 7) % 2 ? CLAWD_WALK_A : CLAWD_WALK_B) : CLAWD_BODY;
     }
-    if (c.pose === 'stand' && !c.climbing) rect(ctx, bx + 3, Math.round(c.y), 10, 1, 'rgba(0,0,0,0.25)');
-    drawSprite(ctx, body, bx, by, { flip: face < 0 });
-    this.drawFace(ctx, bx, by, face, c.napping);
-    this.drawHat(ctx, bx, by, face);
-    this.drawClaws(ctx, bx, by, face);
-    c.rect = [bx - 4, by - 8, 24, 28];
-    if (this.anim.eyeIcon > 0) drawSprite(ctx, EYE_ICON, bx + 4, by - 9);
+    // (bx, by) is the 1x sprite origin; the sprite lands at (BX, BY) drawn CLAWD_SCALE times bigger, feet still on c.y
+    const S = CLAWD_SCALE;
+    const BX = Math.round(c.x - 8 * S), BY = (body === CLAWD_SIT ? by - 14 * (S - 1) : by - 17 * (S - 1));
+    const X = (x) => BX + (x - bx) * S, Y = (y) => BY + (y - by) * S;
+    this.scaled(ctx, bx, by, BX, BY, () => {
+      if (c.pose === 'stand' && !c.climbing) rect(ctx, bx + 3, by + 17, 10, 1, 'rgba(0,0,0,0.25)');
+      drawSprite(ctx, body, bx, by, { flip: face < 0 });
+      this.drawFace(ctx, bx, by, face, c.napping);
+      this.drawHat(ctx, bx, by, face);
+      this.drawClaws(ctx, bx, by, face);
+      if (this.anim.eyeIcon > 0) drawSprite(ctx, EYE_ICON, bx + 4, by - 9);
+      const browsing = (['reading', 'searching', 'researching'].includes(c.activity) || (c.pastime && c.pastime.def.act === 'browse')) && !c.moving;
+      if (browsing) drawSprite(ctx, BOOK, face > 0 ? bx + 17 : bx - 7, by + 8 + (Math.floor(t * 2) % 2));
+    });
+    c.rect = [BX - 4, BY - 8, 16 * S + 8, 17 * S + 8];
     if (c.activity === 'browsing' && !c.moving) {
       const k = Math.floor(t * 2) % 3;
-      text(ctx, 'WWW' + '.'.repeat(k), bx + 2, by - 8, '#93c5fd');
+      text(ctx, 'WWW' + '.'.repeat(k), X(bx + 2), Y(by - 8), '#93c5fd');
     }
-    const browsing = (['reading', 'searching', 'researching'].includes(c.activity) || (c.pastime && c.pastime.def.act === 'browse')) && !c.moving;
-    if (browsing) drawSprite(ctx, BOOK, face > 0 ? bx + 17 : bx - 7, by + 8 + (Math.floor(t * 2) % 2));
     if (c.thought && c.pose !== 'bed') {
       const txt = c.thought.dots ? '.'.repeat(1 + Math.floor(t * 2) % 3) : c.thought.text;
-      this.late.push((g) => bubble(g, txt, bx + 8, by - 2, { thought: true, bg: '#eef2ff' }));
+      this.late.push((g) => bubble(g, txt, X(bx + 8), Y(by - 2), { thought: true, bg: '#eef2ff' }));
     } else if (c.bubble) {
       const txt = c.bubble.text;
-      this.late.push((g) => bubble(g, txt, bx + 8, by - 2, { bg: '#ffffff' }));
+      this.late.push((g) => bubble(g, txt, X(bx + 8), Y(by - 2), { bg: '#ffffff' }));
     } else if (c.moodBadge) {
       const b = c.moodBadge;
-      this.late.push((g) => { const w = textWidth(b.text) + 4; rect(g, bx + 8 - w / 2, by - 9, w, 7, '#0b0d1a'); textCentered(g, b.text, bx + 8, by - 8, b.color); });
+      this.late.push((g) => { const w = textWidth(b.text) + 4; rect(g, X(bx + 8) - w / 2, Y(by - 9), w, 7, '#0b0d1a'); textCentered(g, b.text, X(bx + 8), Y(by - 8), b.color); });
     }
-    if (c.happy > 0 && Math.floor(t * 3) !== Math.floor((t - 0.03) * 3)) this.fx.heart(bx + randInt(0, 12), by - 4);
+    if (c.happy > 0 && Math.floor(t * 3) !== Math.floor((t - 0.03) * 3)) this.fx.heart(X(bx + randInt(0, 12)), Y(by - 4));
+  }
+
+  // Inside scaled(): draw something at 1x (coordinates pre-multiplied by CLAWD_SCALE).
+  unscaled(ctx, fn) { ctx.save(); ctx.scale(1 / CLAWD_SCALE, 1 / CLAWD_SCALE); fn(); ctx.restore(); }
+
+  // Run fn with the canvas scaled so that 1x sprite-space coordinates around (bx, by) land CLAWD_SCALE times bigger at (BX, BY).
+  scaled(ctx, bx, by, BX, BY, fn) {
+    ctx.save();
+    ctx.translate(BX - CLAWD_SCALE * bx, BY - CLAWD_SCALE * by);
+    ctx.scale(CLAWD_SCALE, CLAWD_SCALE);
+    fn();
+    ctx.restore();
   }
 
   drawHat(ctx, bx, by, face) {
@@ -1006,7 +1031,7 @@ export class Actors {
       const k = Math.floor(c.walkT * 7) % 2;
       left(bx - 2, by + 9 + k); right(bx + 15, by + 10 - k);
       if (a.canInHand) drawSprite(ctx, WATERING_CAN, face > 0 ? bx + 17 : bx - 9, by + 9, { flip: face < 0 });
-      if (a.broomInHand) drawBroom(ctx, face > 0 ? bx + 20 : bx - 4, by - 10, face > 0 ? 1 : -1);
+      if (a.broomInHand) this.unscaled(ctx, () => drawBroom(ctx, (face > 0 ? bx + 20 : bx - 4) * CLAWD_SCALE, (by - 10) * CLAWD_SCALE, face > 0 ? 1 : -1));
       return;
     }
     if (c.watering && c.pastime && c.pastime.def.act === 'feed') { fwd(1, 6 + (Math.floor(t * 3) % 2)); back(0, 10); return; }
@@ -1016,7 +1041,7 @@ export class Actors {
       drawSprite(ctx, WATERING_CAN, face > 0 ? bx + 19 : bx - 11, by + 3 + k, { flip: face < 0 });
       return;
     }
-    if (a.broomInHand) { fwd(0, 8); fwd(2, 12); drawBroom(ctx, face > 0 ? bx + 20 : bx - 4, by - 10, face > 0 ? 1 : -1); return; }
+    if (a.broomInHand) { fwd(0, 8); fwd(2, 12); this.unscaled(ctx, () => drawBroom(ctx, (face > 0 ? bx + 20 : bx - 4) * CLAWD_SCALE, (by - 10) * CLAWD_SCALE, face > 0 ? 1 : -1)); return; }
     if (c.stretch > 0) { left(bx - 2, by + 1); right(bx + 15, by + 1); return; }
     if (c.dance > 0) { const k = Math.floor(t * 6) % 2; left(bx - 2, by + (k ? 2 : 10)); right(bx + 15, by + (k ? 10 : 2)); return; }
     if (c.petting) { fwd(1, 13 + (Math.floor(t * 4) % 2)); back(0, 10); return; }

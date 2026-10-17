@@ -126,8 +126,10 @@ Everything is optional. Whatever is not wired stays at its default and the room 
 
 ## Your own art (PixelLab or anything else)
 
-The loft furniture, wardrobe, whiteboard, poster and guitar are PNG sprites made with
-[PixelLab](https://pixellab.ai) and listed in `public/props.json`. Two kinds of entry:
+Nearly all of the furniture (bed, nightstand, wardrobe, guitar, bookshelf, cabinet, plant,
+couch, TV bench, radio, front door, desk, chair, workbench, pegboard, tree, mailbox and the
+loft pieces) is PNG sprites made with [PixelLab](https://pixellab.ai) and listed in
+`public/props.json`. Two kinds of entry:
 
 ```json
 [
@@ -141,8 +143,15 @@ version when the file is missing). Entries with `x` and `y` are simply drawn at 
 (logical pixels on the 480×360 scene, origin top-left), after the furniture and before Clawd.
 Drop a transparent PNG into `public/sprites/`, add a line, reload. `lamp.png` and `boxes.png`
 are spares ready to place. To regenerate or add pieces with PixelLab's Pixen model, ask for a
-side view, a single-colour black outline, flat shading and a transparent background at 32 to
-64 pixels so it matches the house.
+straight-on front view, a single-colour black outline, flat shading and a transparent
+background.
+
+Scale: the house is drawn at roughly 35 logical pixels per metre and Clawd is 32×34 pixels
+(his sprite is drawn at twice its resolution, `CLAWD_SCALE` in `public/js/actors.js`). Keep new
+pieces in that scale: a chair or a desk is about 30 pixels tall, a wardrobe or a bookcase 60
+to 72, a tabletop radio or a small CRT around 20, a TV bench about 12. Pixen fills whatever
+canvas it is given, so for small objects ask for it "drawn very small in the exact centre of
+the image with wide empty transparent margins" and trim the result.
 
 ## Configuration
 
