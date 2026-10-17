@@ -203,6 +203,18 @@ export const WATERING_CAN = {
   ],
 };
 
+const HAT_PAL = { r: '#ef4444', R: '#b91c1c', b: '#2563eb', B: '#1e3a8a', y: '#fde047', Y: '#ca8a04', k: '#1f2937', w: '#ffffff', p: '#ec4899', G: '#4b5563', g: '#9ca3af' };
+export const HATS = {
+  cap: { id: 'hat-cap', pal: HAT_PAL, dx: 2, dy: -1, rows: ['...bbbbbb...', '..bbbbbbbb..', '..bbbbbbbbBB'] },
+  beanie: { id: 'hat-beanie', pal: HAT_PAL, dx: 2, dy: -2, rows: ['....rrrr....', '..rrrrrrrr..', '.rrrrrrrrrr.', '.rRrRrRrRrR.'] },
+  party: { id: 'hat-party', pal: HAT_PAL, dx: 4, dy: -6, rows: ['...y...', '...p...', '..ppp..', '..pyp..', '.ppppp.', '.pypyp.', 'ppppppp'] },
+  tophat: { id: 'hat-top', pal: HAT_PAL, dx: 2, dy: -4, rows: ['..kkkkkkkk..', '..kkkkkkkk..', '..kkkkkkkk..', '..krrrrrrk..', 'kkkkkkkkkkkk'] },
+  crown: { id: 'hat-crown', pal: HAT_PAL, dx: 3, dy: -3, rows: ['y..y..y..y', 'yy.yy.yy.y', 'yyyyyyyyyy', 'yrybyrybyy'] },
+  headphones: { id: 'hat-phones', pal: HAT_PAL, dx: 2, dy: 1, rows: ['..GGGGGGGG..', '.G........G.', 'GG........GG', 'kk........kk', 'kk........kk'] },
+};
+export const PHONE = { id: 'phone', pal: { k: '#111827', b: '#60a5fa', w: '#ffffff' }, rows: ['kkkk', 'kbbk', 'kbwk', 'kbbk', 'kkkk', '.kk.'] };
+export const MINI_GUITAR = { id: 'mini-guitar', pal: { w: '#b45309', d: '#78350f', s: '#e5e7eb', k: '#1f2937' }, rows: ['.......ss', '......sd.', '.....sd..', '....sd...', '.wwwsd...', 'wwkwww...', 'wwwwww...', '.wwww....'] };
+
 export const HEART = { id: 'heart', pal: { r: '#fb7185' }, rows: ['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'] };
 
 export const EYE_ICON = { id: 'eye', pal: { w: '#ffffff', k: '#1e1b4b', c: '#22d3ee' }, rows: ['..www..', '.wwkww.', 'wwkckww', '.wwkww.', '..www..'] };

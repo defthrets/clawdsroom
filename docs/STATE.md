@@ -37,7 +37,7 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | Key | What the room does with it |
 |---|---|
 | `meta.name`, `meta.host` | Title bar. |
-| `clawd.activity` | Where Clawd goes and what he does. One of `idle`, `sleeping`, `terminal`, `watching`, `remote`, `reading`, `tinkering`, `browsing`, `delegating`, `writing`, `speaking`, `looking`, `thinking`. While `idle` he potters: looks out of the window, chills on the couch, pets the dog, checks the post, waters the plant, browses the shelves, has a dance (see `PASTIMES` in `public/js/actors.js`). |
+| `clawd.activity` | Where Clawd goes and what he does. One of `idle`, `sleeping`, `terminal`, `coding`, `watching`, `monitoring`, `remote`, `reading`, `searching`, `researching`, `tinkering`, `browsing`, `delegating`, `writing`, `planning`, `chatting`, `deploying`, `playing`, `speaking`, `looking`, `thinking`. While `idle` he potters: looks out of the window, chills on the couch, pets the dog, checks the post, waters the plant, browses the shelves, has a dance (see `PASTIMES` in `public/js/actors.js`). |
 | `clawd.status` | Short text. Shown in the title bar and in Clawd's speech bubble when it changes. |
 | `clawd.mood` | His face: `happy`, `calm`, `focused`, `excited`, `surprised`, `alert`, `worried`, `sad`, `angry`, `bored`, `sleepy`. The room also works some out itself: worried when the battery is low, the watchdog is unhappy or the CPU is cooking; bored after a long quiet idle; focused at the desk; short flashes of excited/angry/happy on events. The title bar and his tap card say what he is feeling. |
 | `clawd.dream` | Thought bubble while he sleeps. |
@@ -112,3 +112,6 @@ Daily counters (`cams.events_today`, `bus.messages_today`, `chirpa.*_today`) res
 | The road out the back (WWW) | Web search / browser (`browsing`, `network`) |
 | Helper bots in the garage | Subagents (`subagents`, `subagent` events) |
 | The crew photo | Who's home (`crew`) |
+| The loft (console, hammock, telescope, punchbag, records) | RetroShelf (`storage.games`), ADS-B (`sdr.planes`), and plain downtime |
+| Whiteboard | `planning` |
+| Wardrobe, dog bowl, broom, guitar | Idle pastimes only |

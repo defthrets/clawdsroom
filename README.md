@@ -52,6 +52,20 @@ dance. He only stands still while he is actually doing something or having a bre
 sunrise and sunset he does the rounds with the watering can: the big plant in the living room,
 then the one upstairs. Skip a day and they droop.
 
+**Jobs from the homelab** each have a place: `terminal` and `coding` at the desk (the monitor
+shows a shell or code), `reading`, `searching` and `researching` at the bookshelf, `planning` at
+the whiteboard, `chatting` on the couch with the phone, `monitoring` with the dashboard on the TV,
+`deploying` at the cupboard, `remote` on the laptop, `tinkering` at the bench, `browsing` out the
+back, `delegating` in the garage, `writing` at the nightstand, `playing` on the loft console.
+
+**The loft** under the roof is his: a retro corner (RetroShelf), a hammock, a telescope at the
+skylight (planes by day, stars by night), a punchbag for bad days, a record player and an arcade
+poster. He climbs a ladder from the library. Around the house there is also a wardrobe of hats, a
+whiteboard, a dog bowl, a broom and a guitar. Nearly forty idle pastimes use them: channel
+hopping, plumping cushions, dusting the crew photo, feeding the dog, sweeping the garage,
+tidying the desk, making the bed, trying on hats, checking the mirror, strumming the guitar,
+rummaging through old downloads, letting off steam, swinging in the hammock...
+
 **His face shows how he feels.** Set `clawd.mood` from the homelab (`happy`, `calm`, `focused`,
 `excited`, `surprised`, `alert`, `worried`, `sad`, `angry`, `bored`, `sleepy`) and the eyebrows,
 eyes and mouth follow. The room also reads the situation itself: worried when the battery is
@@ -109,6 +123,26 @@ curl -X POST 'http://192.168.1.253:8787/api/event?type=plane&callsign=BAW123&alt
 | **Weather** | `room state weather.condition=rain weather.sunrise=06:40 weather.sunset=18:20` (optional; drives the sky). |
 
 Everything is optional. Whatever is not wired stays at its default and the room still looks fine.
+
+## Your own art (PixelLab or anything else)
+
+The loft furniture, wardrobe, whiteboard, poster and guitar are PNG sprites made with
+[PixelLab](https://pixellab.ai) and listed in `public/props.json`. Two kinds of entry:
+
+```json
+[
+  { "id": "crt", "src": "/sprites/crt.png" },
+  { "src": "/sprites/lamp.png", "x": 230, "y": 256, "flip": false }
+]
+```
+
+Named entries (`id`) are used by the rooms themselves (the room falls back to a hand-drawn
+version when the file is missing). Entries with `x` and `y` are simply drawn at that spot
+(logical pixels on the 480×360 scene, origin top-left), after the furniture and before Clawd.
+Drop a transparent PNG into `public/sprites/`, add a line, reload. `lamp.png` and `boxes.png`
+are spares ready to place. To regenerate or add pieces with PixelLab's Pixen model, ask for a
+side view, a single-colour black outline, flat shading and a transparent background at 32 to
+64 pixels so it matches the house.
 
 ## Configuration
 

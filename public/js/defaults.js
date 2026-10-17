@@ -19,6 +19,14 @@ export const ACTIVITIES = [
   'speaking',    // talking (TTS) wherever he is
   'looking',     // vision: eyes wide open
   'thinking',    // thought bubble wherever he is
+  'coding',      // at the desk, writing code (the monitor shows code)
+  'searching',   // at the bookshelves, looking something up
+  'researching', // same as searching
+  'planning',    // at the whiteboard, boxes and arrows
+  'chatting',    // on the couch with the phone, talking to you
+  'deploying',   // at the cupboard, shipping something to the homelab
+  'monitoring',  // on the couch with the dashboard on the TV
+  'playing',     // in the loft, on the console (RetroShelf)
 ];
 
 export const DEFAULT_STATE = {

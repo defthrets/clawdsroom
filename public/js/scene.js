@@ -11,17 +11,21 @@ export const H = 360;
 export const L = {
   groundY: 300,
   road: { y: 304, h: 18 },
-  feet: { upper: 190, lower: 300, outside: 304 },
+  feet: { loft: 100, upper: 190, lower: 300, outside: 304 },
   house: { x: 70, w: 320 },
-  roof: { eaveY: 100, ridgeY: 68, ridgeX1: 120, ridgeX2: 340, eaveX1: 62, eaveX2: 398 },
+  roof: { eaveY: 100, ridgeY: 40, ridgeX1: 122, ridgeX2: 338, eaveX1: 62, eaveX2: 398 },
   rooms: {
-    bedroom: { x: 72, y: 102, w: 156, h: 88, floor: 'upper' },
-    library: { x: 232, y: 102, w: 156, h: 88, floor: 'upper' },
+    loft: { x: 104, y: 46, w: 256, h: 54, floor: 'loft' },
+    bedroom: { x: 72, y: 106, w: 156, h: 84, floor: 'upper' },
+    library: { x: 232, y: 106, w: 156, h: 84, floor: 'upper' },
     living: { x: 72, y: 196, w: 156, h: 104, floor: 'lower' },
     office: { x: 232, y: 196, w: 156, h: 104, floor: 'lower' },
     garage: { x: 390, y: 198, w: 70, h: 102, floor: 'lower' },
   },
   stairs: { x: 234, w: 52, bottomY: 300, topY: 190, steps: 13 },
+  ladder: { x: 248, top: 100, bottom: 190 },
+  hatch: { x: 241, w: 14 },
+  loftWalk: [114, 350],
   frontDoor: { x: 72, y: 270, w: 12, h: 30 },
   garageDoor: { x: 458, y: 268, w: 4, h: 32 },
   mailbox: { x: 8, y: 270 },
@@ -38,8 +42,9 @@ export const L = {
   bed: { x: 80, y: 152, w: 72 },
   nightstand: { x: 156, y: 172, w: 18, h: 18 },
   clock: { cx: 202, cy: 124, r: 9 },
-  bedWindow: { x: 186, y: 142, w: 28, h: 24 },
-  photoWall: { x: 240, y: 112, cols: 3, rows: 2, fw: 12, fh: 10, gap: 4 },
+  wardrobe: { x: 182, y: 138, w: 32, h: 52 },
+  guitar: { x: 214, y: 160 },
+  photoWall: { x: 256, y: 112, cols: 2, rows: 3, fw: 12, fh: 10, gap: 4 },
   bookshelf: { x: 296, y: 118, w: 42, h: 72, shelves: 5 },
   cabinet: { x: 344, y: 150, w: 18, h: 40 },
   plant: { x: 368, y: 166 },
@@ -51,14 +56,27 @@ export const L = {
   cupboard: { x: 370, y: 232, w: 18, h: 68 },
   speaker: { x: 374, y: 220, w: 10, h: 12 },
   thermo: { x: 300, y: 206, h: 26 },
+  whiteboard: { x: 310, y: 205, w: 52, h: 29 },
+  dogBowl: { x: 287, y: 296 },
+  broom: { x: 393, y: 262 },
   garageShelf: { x: 394, y: 204, w: 62, h: 30 },
   battery: { x: 396, y: 240, w: 18, h: 34 },
   pegboard: { x: 424, y: 244, w: 32, h: 26 },
   workbench: { x: 424, y: 276, w: 32, h: 24 },
   botDock: { x: 398, y: 290 },
   signpost: { x: 470, y: 268 },
-  panels: { x: 132, y: 60, n: 4, w: 22, h: 8, gap: 3 },
-  chimney: { x: 300, y: 46, w: 12, h: 24 },
+  panels: { x: 132, y: 32, n: 4, w: 22, h: 8, gap: 3 },
+  chimney: { x: 300, y: 18, w: 12, h: 24 },
+  // the loft
+  telescope: { x: 106, y: 52 },
+  skylight: { cx: 110, cy: 48, r: 5 },
+  crt: { x: 151, y: 56, w: 32, h: 30 },
+  crate: { x: 148, y: 86, w: 36, h: 14 },
+  beanbag: { x: 184, y: 70, w: 32, seatY: 86 },
+  recordPlayer: { x: 218, y: 72, w: 22 },
+  poster: { x: 216, y: 50 },
+  punchbag: { x: 254, y: 64, w: 11, h: 31 },
+  hammock: { x1: 300, x2: 356, y: 69, sag: 18, seatY: 86 },
 };
 
 // Where Clawd goes for each activity (feet x, floor, facing).
@@ -228,6 +246,11 @@ export function drawHouseShell(ctx, day, t, cpu) {
   rect(ctx, r.office.x, L.feet.lower - 4, r.office.w, 4, C.floorTile);
   for (let x = r.office.x; x < r.office.x + r.office.w; x += 6) rect(ctx, x, L.feet.lower - 4, 1, 4, C.floorTileDk);
   rect(ctx, r.garage.x, L.feet.lower - 4, r.garage.w, 4, C.floorGarage);
+  // loft floor slab (with the ladder hatch)
+  rect(ctx, L.house.x, 100, L.house.w, 6, C.slab);
+  hline(ctx, L.house.x, L.house.x + L.house.w - 1, 100, C.slabEdge);
+  hline(ctx, L.house.x, L.house.x + L.house.w - 1, 105, C.slabEdge);
+  rect(ctx, L.hatch.x, 100, L.hatch.w, 6, '#2a2024');
   // slab between floors (with the stairwell opening)
   rect(ctx, L.house.x, 190, L.house.w, 6, C.slab);
   hline(ctx, L.house.x, L.house.x + L.house.w - 1, 190, C.slabEdge);
@@ -236,11 +259,11 @@ export function drawHouseShell(ctx, day, t, cpu) {
   // bottom slab / foundation
   rect(ctx, L.house.x, L.groundY, L.house.w, 4, C.slabEdge);
   // outer walls + divider
-  rect(ctx, L.house.x, 102, 2, 198, C.brick);
-  rect(ctx, L.house.x + L.house.w - 2, 102, 2, 198, C.brick);
-  rect(ctx, 228, 102, 4, 88, C.brick);
+  rect(ctx, L.house.x, 106, 2, 194, C.brick);
+  rect(ctx, L.house.x + L.house.w - 2, 106, 2, 194, C.brick);
+  rect(ctx, 228, 106, 4, 84, C.brick);
   rect(ctx, 228, 196, 4, 104, C.brick);
-  for (let y = 104; y < 300; y += 6) { px(ctx, L.house.x, y, C.brickDk); px(ctx, L.house.x + L.house.w - 1, y + 3, C.brickDk); px(ctx, 229 + (y % 12 === 0 ? 1 : 0), y, C.brickDk); }
+  for (let y = 108; y < 300; y += 6) { px(ctx, L.house.x, y, C.brickDk); px(ctx, L.house.x + L.house.w - 1, y + 3, C.brickDk); px(ctx, 229 + (y % 12 === 0 ? 1 : 0), y, C.brickDk); }
   // internal door to the garage
   rect(ctx, 386, 270, 6, 30, '#2a2024');
   // garage
@@ -251,8 +274,9 @@ export function drawHouseShell(ctx, day, t, cpu) {
   for (let y = 200; y < 300; y += 6) px(ctx, g.x + g.w + 1, y, C.brickDk);
   rect(ctx, g.x + g.w - 1, L.garageDoor.y, 4, L.garageDoor.h, '#1a1216'); // doorway
   rect(ctx, g.x + g.w - 2, L.garageDoor.y - 4, 6, 4, C.metalDk); // rolled-up door
-  // roof
+  // roof + the loft inside it
   roof(ctx);
+  drawLoftShell(ctx);
   // chimney + smoke handled by effects; draw the stack
   const ch = L.chimney;
   box(ctx, ch.x, ch.y, ch.w, ch.h, C.brick, C.outline, null, C.brickDk);
@@ -284,15 +308,20 @@ function floorWood(ctx, x, y, w, h) {
   rect(ctx, x, y, w, 1, C.floorWoodLt);
 }
 
+function roofPath(ctx, inset = 0) {
+  const r = L.roof;
+  ctx.beginPath();
+  ctx.moveTo(r.eaveX1 + inset * 1.4, r.eaveY); ctx.lineTo(r.ridgeX1 + inset * 0.6, r.ridgeY + inset * 1.4);
+  ctx.lineTo(r.ridgeX2 - inset * 0.6, r.ridgeY + inset * 1.4); ctx.lineTo(r.eaveX2 - inset * 1.4, r.eaveY);
+  ctx.closePath();
+}
+
 function roof(ctx) {
   const r = L.roof;
-  // trapezoid roof
   ctx.fillStyle = C.roof;
-  ctx.beginPath();
-  ctx.moveTo(r.eaveX1, r.eaveY); ctx.lineTo(r.ridgeX1, r.ridgeY); ctx.lineTo(r.ridgeX2, r.ridgeY); ctx.lineTo(r.eaveX2, r.eaveY); ctx.closePath();
-  ctx.fill();
-  // tile rows
-  for (let y = r.ridgeY + 4; y < r.eaveY; y += 5) {
+  roofPath(ctx); ctx.fill();
+  // tile rows on the slopes and the ridge band
+  for (let y = r.ridgeY + 3; y < r.eaveY; y += 5) {
     const tt = (y - r.ridgeY) / (r.eaveY - r.ridgeY);
     const x1 = Math.round(lerp(r.ridgeX1, r.eaveX1, tt)), x2 = Math.round(lerp(r.ridgeX2, r.eaveX2, tt));
     hline(ctx, x1, x2, y, C.roofDk);
@@ -302,7 +331,26 @@ function roof(ctx) {
   line(ctx, r.eaveX1, r.eaveY, r.ridgeX1, r.ridgeY, C.outline);
   line(ctx, r.eaveX2, r.eaveY, r.ridgeX2, r.ridgeY, C.outline);
   hline(ctx, r.eaveX1, r.eaveX2, r.eaveY, C.outline);
-  hline(ctx, r.eaveX1 + 1, r.eaveX2 - 1, r.eaveY + 1, C.slab);
+}
+
+// The loft interior: a trapezoid cut out of the roof, with planks and rafters.
+function drawLoftShell(ctx) {
+  const r = L.roof;
+  ctx.fillStyle = '#4a3326';
+  roofPath(ctx, 6); ctx.fill();
+  ctx.save();
+  roofPath(ctx, 6); ctx.clip();
+  // plank wall
+  for (let y = r.ridgeY + 8; y < r.eaveY; y += 7) hline(ctx, r.eaveX1, r.eaveX2, y, '#3d291e');
+  // rafters
+  for (let x = r.ridgeX1 - 10; x <= r.ridgeX2 + 10; x += 32) { rect(ctx, x, r.ridgeY + 6, 3, r.eaveY - r.ridgeY, '#5a3d2c'); rect(ctx, x, r.ridgeY + 6, 1, r.eaveY - r.ridgeY, '#6b4a36'); }
+  rect(ctx, r.ridgeX1, r.ridgeY + 6, r.ridgeX2 - r.ridgeX1, 3, '#5a3d2c');
+  ctx.restore();
+  // floor boards
+  floorWood(ctx, L.rooms.loft.x - 24, L.feet.loft - 4, L.rooms.loft.w + 48, 4);
+  // the skylight on the right slope
+  const sk = L.skylight;
+  disc(ctx, sk.cx, sk.cy, sk.r + 1, C.outline);
 }
 
 export function drawStairs(ctx) {
@@ -363,16 +411,15 @@ export function drawBedroom(ctx, store, t, anim) {
   if (anim.journalGlow > 0) { outline(ctx, n.x + 1, n.y - 6, 8, 7, '#fde68a'); }
   // wall clock with cron ticks
   drawClock(ctx, store, t, anim.clockShake);
-  // small window with the sky
-  const w = L.bedWindow;
-  const day = store.dayFactor();
-  const { top, bot } = skyColors(day);
-  rect(ctx, w.x, w.y, w.w, w.h, mix(top, bot, 0.5));
-  if (day < 0.5) { px(ctx, w.x + 6, w.y + 5, '#fff'); px(ctx, w.x + 18, w.y + 9, '#fff'); px(ctx, w.x + 12, w.y + 15, '#e0e7ff'); }
-  outline(ctx, w.x - 1, w.y - 1, w.w + 2, w.h + 2, C.white);
-  vline(ctx, w.x + Math.floor(w.w / 2), w.y, w.y + w.h - 1, C.white);
-  hline(ctx, w.x, w.x + w.w - 1, w.y + Math.floor(w.h / 2), C.white);
-  rect(ctx, w.x - 4, w.y - 3, 4, w.h + 6, '#b45309'); rect(ctx, w.x + w.w, w.y - 3, 4, w.h + 6, '#b45309');
+  // wardrobe with a mirror on the door (+ the guitar leaning next to it)
+  const wd = L.wardrobe;
+  if (!drawProp(ctx, 'wardrobe', wd.x, wd.y)) {
+    box(ctx, wd.x, wd.y, wd.w, wd.h, C.wood, C.outline, C.woodLt, C.woodDk);
+    rect(ctx, wd.x + Math.floor(wd.w / 2), wd.y + 2, 1, wd.h - 4, C.woodDk);
+    rect(ctx, wd.x + 3, wd.y + 6, 9, 30, '#bfdbfe'); outline(ctx, wd.x + 3, wd.y + 6, 9, 30, '#93c5fd');
+  }
+  if (anim.wardrobeOpen) { rect(ctx, wd.x + 17, wd.y + 4, 12, wd.h - 10, '#2a1b12'); for (let i = 0; i < 3; i++) rect(ctx, wd.x + 19, wd.y + 9 + i * 12, 8, 3, ['#ef4444', '#2563eb', '#fde047'][i]); }
+  if (!anim.guitarAway) { if (!drawProp(ctx, 'guitar', L.guitar.x, L.guitar.y)) { rect(ctx, L.guitar.x + 5, L.guitar.y, 3, 18, '#78350f'); disc(ctx, L.guitar.x + 6, L.guitar.y + 24, 6, '#b45309'); } }
   // poster
   box(ctx, 118, 112, 18, 22, '#1e1b4b', C.white);
   disc(ctx, 127, 121, 4, '#b196ff'); px(ctx, 125, 120, '#fff'); px(ctx, 129, 120, '#fff');
@@ -419,7 +466,7 @@ export function drawLibrary(ctx, store, t, anim) {
     miniPhoto(ctx, x + 1, y + 1, p.fw - 2, p.fh - 2, seed);
     if (anim.photoFlash > 0 && i === anim.photoFlashIndex) { ctx.globalAlpha = Math.min(1, anim.photoFlash); rect(ctx, x, y, p.fw, p.fh, '#fff'); ctx.globalAlpha = 1; }
   }
-  textCentered(ctx, `${fmtCount(s.immich.photos)} PHOTOS`, p.x + (p.cols * (p.fw + p.gap) - p.gap) / 2, p.y + p.rows * (p.fh + p.gap) + 1, '#e9d5ff');
+  text(ctx, `${fmtCount(s.immich.photos)} PHOTOS`, p.x, p.y + p.rows * (p.fh + p.gap) + 1, '#e9d5ff');
   // bookshelf (memory)
   const b = L.bookshelf;
   box(ctx, b.x, b.y, b.w, b.h, C.wood, C.outline, C.woodLt, C.woodDk);
@@ -539,10 +586,14 @@ export function drawLivingRoom(ctx, store, t, anim) {
   rect(ctx, c.x + 2, c.seatY + 10, 3, 8, C.woodDk); rect(ctx, c.x + c.w - 5, c.seatY + 10, 3, 8, C.woodDk);
   outline(ctx, c.x + 2, c.y, c.w - 4, 14, '#7f1d1d');
   rect(ctx, c.x + 8, c.y + 4, 12, 8, '#fbbf24'); // cushion
-  // dog bed
+  // dog bed + bowl
   const d = L.dogBed;
   box(ctx, d.x - 2, d.y, d.w + 4, d.h, '#6d28d9', C.outline, '#8b5cf6');
   rect(ctx, d.x, d.y + 2, d.w, 4, '#a78bfa');
+  const bw = L.dogBowl;
+  rect(ctx, bw.x, bw.y + 1, 8, 3, '#dc2626'); rect(ctx, bw.x + 1, bw.y, 6, 1, '#dc2626'); outline(ctx, bw.x, bw.y, 8, 4, '#7f1d1d');
+  const fill = clamp(anim.bowlFill || 0, 0, 1);
+  if (fill > 0) rect(ctx, bw.x + 2, bw.y + 1, Math.max(1, Math.round(4 * fill)), 1, '#a16207');
 }
 
 // Hours since the last drink decide how perky the leaves are.
@@ -662,6 +713,8 @@ export function drawOffice(ctx, store, t, anim) {
   rect(ctx, th.x + 1, th.y + th.h - 1 - fill, 2, fill, temp > 80 ? '#ef4444' : temp > 65 ? '#f97316' : '#3b82f6');
   disc(ctx, th.x + 2, th.y + th.h + 1, 3, temp > 80 ? '#ef4444' : temp > 65 ? '#f97316' : '#3b82f6');
   text(ctx, `${Math.round(temp)}°`, th.x - 3, th.y - 8, '#e2e8f0');
+  // whiteboard
+  drawWhiteboard(ctx, t, anim);
   // chair
   const ch = L.chair;
   rect(ctx, ch.x, ch.y, 3, 16, '#1f2937'); rect(ctx, ch.x, ch.y + 16, 14, 3, '#1f2937');
@@ -689,12 +742,28 @@ export function drawOffice(ctx, store, t, anim) {
     box(ctx, lp.x, lp.y + 4, lp.w, 4, '#9ca3af', '#4b5563'); px(ctx, lp.x + 7, lp.y + 5, '#fff');
   }
   // the cupboard (the homelab itself)
-  drawCupboard(ctx, store, t);
+  drawCupboard(ctx, store, t, anim);
   // speaker on top
   const sp = L.speaker;
   box(ctx, sp.x, sp.y, sp.w, sp.h, '#1f2937', C.outline, '#374151');
   disc(ctx, sp.x + 5, sp.y + 4, 2, '#6b7280'); disc(ctx, sp.x + 5, sp.y + 9, 1, '#6b7280');
   if (anim.speaking) { px(ctx, sp.x + 5, sp.y + 4, '#22d3ee'); }
+}
+
+function drawWhiteboard(ctx, t, anim) {
+  const wb = L.whiteboard;
+  if (!drawProp(ctx, 'whiteboard', wb.x, wb.y)) {
+    box(ctx, wb.x, wb.y, wb.w, wb.h, '#f8fafc', C.metalDk, null, '#cbd5e1');
+    rect(ctx, wb.x + 6, wb.y + wb.h - 3, 4, 2, '#ef4444'); rect(ctx, wb.x + 11, wb.y + wb.h - 3, 4, 2, '#2563eb');
+  }
+  const items = anim.board || [];
+  for (const it of items) {
+    if (it.type === 'box') outline(ctx, wb.x + it.x, wb.y + it.y, it.w, it.h, it.color);
+    else if (it.type === 'line') hline(ctx, wb.x + it.x, wb.x + it.x + it.w, wb.y + it.y, it.color);
+    else if (it.type === 'arrow') { hline(ctx, wb.x + it.x, wb.x + it.x + it.w, wb.y + it.y, it.color); px(ctx, wb.x + it.x + it.w - 1, wb.y + it.y - 1, it.color); px(ctx, wb.x + it.x + it.w - 1, wb.y + it.y + 1, it.color); }
+    else if (it.type === 'dot') px(ctx, wb.x + it.x, wb.y + it.y, it.color);
+  }
+  if (anim.boardTitle) text(ctx, anim.boardTitle, wb.x + 4, wb.y + 3, '#1e3a8a');
 }
 
 function drawMonitor(ctx, store, t, anim) {
@@ -709,7 +778,12 @@ function drawMonitor(ctx, store, t, anim) {
     return;
   }
   rect(ctx, sx, sy, sw, sh, '#07140d');
-  if (anim.monitorMode === 'terminal') {
+  if (anim.monitorMode === 'code') {
+    const cols = ['#93c5fd', '#fde68a', '#86efac', '#f0abfc'];
+    const lines = anim.codeLines || [];
+    lines.slice(-3).forEach((l, i) => text(ctx, l.slice(0, 8), sx + 1, sy + 2 + i * 6, cols[(l.length + i) % cols.length]));
+    if (Math.floor(t * 2) % 2 === 0) rect(ctx, sx + 1 + Math.min(8, (lines[lines.length - 1] || '').length) * 4, sy + 2 + Math.min(lines.length, 3) * 6, 3, 5, '#93c5fd');
+  } else if (anim.monitorMode === 'terminal') {
     const lines = anim.termLines || [];
     lines.slice(-3).forEach((l, i) => text(ctx, l.slice(0, 8), sx + 1, sy + 2 + i * 6, i === lines.slice(-3).length - 1 ? '#bbf7d0' : '#4ade80'));
     const last = lines.length ? Math.min(lines.length, 3) : 0;
@@ -725,7 +799,7 @@ function drawMonitor(ctx, store, t, anim) {
   hline(ctx, sx, sx + sw - 1, sy, 'rgba(255,255,255,0.1)');
 }
 
-function drawCupboard(ctx, store, t) {
+function drawCupboard(ctx, store, t, anim) {
   const c = L.cupboard;
   const s = store.state;
   box(ctx, c.x, c.y, c.w, c.h, C.wood, C.outline, C.woodLt, C.woodDk);
@@ -751,6 +825,13 @@ function drawCupboard(ctx, store, t) {
   px(ctx, fx, fy, '#d1d5db');
   // label
   text(ctx, 'LAB', c.x + 3, c.y - 7, '#cbd5e1');
+  if (anim && anim.deploy > 0) {
+    const k = clamp(anim.deploy, 0, 1);
+    rect(ctx, c.x - 14, c.y + 20, 30, 7, '#0b0d1a');
+    rect(ctx, c.x - 13, c.y + 21, 28, 5, '#1f2937'); rect(ctx, c.x - 13, c.y + 21, Math.round(28 * k), 5, '#22c55e');
+    textCentered(ctx, `${Math.round(k * 100)}%`, c.x + 1, c.y + 22, '#ffffff');
+    if (Math.floor(t * 6) % 2 === 0) for (let i = 0; i < 5; i++) px(ctx, c.x + 5 + (i % 3) * 2, c.y + 8 + i * 11, '#22c55e');
+  }
 }
 
 // ----------------------------------------------------------------- garage
@@ -790,6 +871,8 @@ export function drawGarage(ctx, store, t, anim) {
   rect(ctx, wb.x + 4, wb.y - 6, 8, 6, '#f8fafc'); for (let i = 0; i < 3; i++) hline(ctx, wb.x + 5, wb.x + 10, wb.y - 5 + i * 2, '#94a3b8');
   box(ctx, wb.x + 20, wb.y - 6, 6, 6, '#3b82f6', C.outline); px(ctx, wb.x + 26, wb.y - 4, '#3b82f6');
   if (anim.tinkering) { if (Math.floor(t * 6) % 3 === 0) px(ctx, wb.x + 14, wb.y - 2, '#fde68a'); }
+  // broom leaning on the wall
+  if (!anim.broomInHand) drawBroom(ctx, L.broom.x, L.broom.y, 1);
   // bot docks
   for (let i = 0; i < 3; i++) rect(ctx, L.botDock.x + i * 10 - 1, L.feet.lower - 1, 10, 1, '#22d3ee');
 }
@@ -821,6 +904,132 @@ function drawBattery(ctx, store, t, anim) {
   text(ctx, `SOLAR ${label}`, pn.x, pn.y - 8, solar > 0 ? '#fde68a' : '#94a3b8');
   // cable from the panels down to the garage battery
   if (solar > 0) { const k = Math.floor(t * 8) % 4; for (let y = pn.y + pn.h + 2; y < L.roof.eaveY; y += 4) if ((y / 4 + k) % 4 === 0) px(ctx, pn.x + pn.n * (pn.w + pn.gap) + 2, y, '#fde047'); }
+}
+
+// ----------------------------------------------------------------- loft + props
+export function drawBroom(ctx, x, y, lean = 0) {
+  // handle 26 tall, bristles at the bottom
+  for (let i = 0; i < 26; i++) px(ctx, x + Math.round(i * lean * 0.12), y + i, C.woodLt);
+  const bx = x + Math.round(26 * lean * 0.12);
+  rect(ctx, bx - 3, y + 26, 8, 2, '#a16207'); rect(ctx, bx - 4, y + 28, 10, 5, '#d4a24c');
+  for (let i = 0; i < 10; i += 2) px(ctx, bx - 4 + i, y + 32, '#a16207');
+}
+
+export function drawLadder(ctx) {
+  const l = L.ladder;
+  rect(ctx, l.x - 4, l.top + 4, 2, l.bottom - l.top - 4, C.wood); rect(ctx, l.x + 3, l.top + 4, 2, l.bottom - l.top - 4, C.wood);
+  for (let y = l.top + 8; y < l.bottom - 2; y += 7) rect(ctx, l.x - 3, y, 7, 1, C.woodLt);
+}
+
+export function drawLoft(ctx, store, t, anim) {
+  const s = store.state;
+  const day = store.dayFactor();
+  // skylight on the left slope, showing the sky
+  const sk = L.skylight;
+  const { top, bot } = skyColors(day);
+  disc(ctx, sk.cx, sk.cy, sk.r, mix(top, bot, 0.3));
+  if (day < 0.5) { px(ctx, sk.cx - 2, sk.cy - 2, '#fff'); px(ctx, sk.cx + 2, sk.cy + 1, '#e0e7ff'); px(ctx, sk.cx, sk.cy + 2, Math.floor(t * 2) % 2 ? '#fff' : '#c7d2fe'); }
+  else if (anim.scopeOn && Math.floor(t) % 3 === 0) { rect(ctx, sk.cx - 3 + (Math.floor(t * 8) % 6), sk.cy - 1, 3, 1, '#e5e7eb'); }
+  hline(ctx, sk.cx - sk.r, sk.cx + sk.r, sk.cy, C.white); vline(ctx, sk.cx, sk.cy - sk.r, sk.cy + sk.r, C.white);
+  // arcade poster on the back wall
+  const po = L.poster;
+  if (!drawProp(ctx, 'poster', po.x, po.y)) { box(ctx, po.x, po.y, 22, 22, '#1e1b4b', C.white); text(ctx, 'PLAY', po.x + 3, po.y + 8, '#c4b5fd'); }
+  // telescope (flipped: lens up-left to the skylight)
+  const te = L.telescope;
+  if (!drawProp(ctx, 'telescope', te.x, te.y, { flip: true })) {
+    line(ctx, te.x + 16, 100, te.x + 11, 86, '#64748b'); line(ctx, te.x + 16, 100, te.x + 21, 86, '#64748b'); line(ctx, te.x + 16, 99, te.x + 16, 86, '#94a3b8');
+    line(ctx, te.x + 16, 86, sk.cx + 2, sk.cy + 5, '#1f2937'); line(ctx, te.x + 17, 86, sk.cx + 3, sk.cy + 5, '#374151');
+  }
+  px(ctx, sk.cx + 2, sk.cy + 4, anim.scopeOn ? '#7dd3fc' : '#0ea5e9');
+  // retro corner: crate, CRT + console, beanbag
+  const cr = L.crate, tv = L.crt;
+  box(ctx, cr.x, cr.y, cr.w, cr.h, '#a16207', C.outline, '#d4a24c', '#78350f');
+  rect(ctx, cr.x + 2, cr.y + 2, cr.w - 4, 1, '#78350f'); rect(ctx, cr.x + 2, cr.y + cr.h - 3, cr.w - 4, 1, '#78350f');
+  const hasCrt = drawProp(ctx, 'crt', tv.x, tv.y);
+  const scx = hasCrt ? tv.x + 8 : tv.x + 3, scy = hasCrt ? tv.y + 4 : tv.y + 3, scw = hasCrt ? 15 : tv.w - 8, sch = hasCrt ? 10 : tv.h - 6;
+  if (!hasCrt) box(ctx, tv.x, tv.y, tv.w, tv.h, '#cbd5e1', C.outline, '#f1f5f9', '#94a3b8');
+  if (anim.retroOn) {
+    rect(ctx, scx, scy, scw, sch, '#0f172a');
+    const k = Math.floor(t * 2);
+    const cols = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+    for (let c = 0; c < 5; c++) { const h = 1 + ((c * 7 + k) % 3); for (let yy = 0; yy < h; yy++) rect(ctx, scx + 1 + c * 3, scy + sch - 1 - yy * 2, 2, 2, cols[(c + yy) % cols.length]); }
+    const fx = scx + 1 + ((k * 3) % 5) * 3, fy = scy + 1 + (Math.floor(t * 6) % 3) * 2;
+    rect(ctx, fx, fy, 2, 2, '#fde047');
+    if (Math.floor(t * 4) % 8 === 0) text(ctx, 'GO', scx + 4, scy + 1, '#ffffff');
+  } else if (!hasCrt) {
+    rect(ctx, scx, scy, scw, sch, '#1e293b'); px(ctx, scx + 1, scy + 1, '#334155');
+  }
+  const bb = L.beanbag;
+  if (!drawProp(ctx, 'beanbag', bb.x, bb.y)) { for (let yy = 0; yy < 12; yy++) { const w = Math.round(bb.w * Math.sin(Math.PI * (0.2 + 0.8 * (yy / 12)) / 1.6) + 6); rect(ctx, bb.x + Math.floor((bb.w - w) / 2), L.feet.loft - 12 + yy, w, 1, yy < 2 ? '#16a34a' : '#15803d'); } }
+  textCentered(ctx, `${fmtCount(s.storage.games || 0)} GAMES`, tv.x + tv.w / 2, tv.y - 7, '#fde68a');
+  // record player
+  const rp = L.recordPlayer;
+  if (!drawProp(ctx, 'recordplayer', rp.x, rp.y)) {
+    box(ctx, rp.x, rp.y + 12, rp.w, 16, C.wood, C.outline, C.woodLt, C.woodDk);
+    box(ctx, rp.x + 1, rp.y + 6, rp.w - 2, 6, '#374151', C.outline, '#4b5563');
+    disc(ctx, rp.x + 8, rp.y + 9, 3, '#111827');
+  }
+  if (anim.recordOn) { const a = t * 6; px(ctx, rp.x + 9 + Math.round(Math.cos(a) * 3), rp.y + 10 + Math.round(Math.sin(a) * 2), '#ef4444'); }
+  // punchbag hanging from the ridge beam
+  const pb = L.punchbag;
+  const sway = anim.punch > 0 ? Math.round(Math.sin(t * 14) * 2) : 0;
+  rect(ctx, pb.x + 5 + Math.round(sway / 2), 46, 2, pb.y - 46, '#64748b');
+  if (!drawProp(ctx, 'punchbag', pb.x + sway, pb.y)) box(ctx, pb.x + sway + 1, pb.y, 9, pb.h, '#b91c1c', C.outline, '#ef4444', '#7f1d1d');
+  // hammock between two posts
+  const hm = L.hammock;
+  if (!drawProp(ctx, 'hammock', hm.x1, hm.y)) {
+    rect(ctx, hm.x1 - 2, hm.y - 4, 3, L.feet.loft - hm.y + 4, '#5a3d2c'); rect(ctx, hm.x2, hm.y - 4, 3, L.feet.loft - hm.y + 4, '#5a3d2c');
+    for (let x = hm.x1; x <= hm.x2; x++) { const k = (x - hm.x1) / (hm.x2 - hm.x1); const y = hm.y + Math.round(Math.sin(Math.PI * k) * hm.sag); px(ctx, x, y, '#f59e0b'); px(ctx, x, y + 1, '#d97706'); }
+  }
+  // ladder down to the library
+  drawLadder(ctx);
+}
+
+// Extra art dropped in as PNGs (for example from PixelLab): public/props.json lists
+// {src, x, y, w?, h?, flip?}. They are drawn after the furniture, before Clawd.
+let propsList = null;
+const propImages = new Map();
+export function loadProps() {
+  if (propsList) return;
+  propsList = [];
+  fetch('/props.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).then((list) => {
+    if (!Array.isArray(list)) return;
+    propsList = list.filter((p) => p && p.src);
+    for (const p of propsList) {
+      const img = new Image();
+      img.onload = () => propImages.set(p.src, img);
+      img.src = p.src;
+    }
+  }).catch(() => {});
+}
+
+export function propImage(id) {
+  if (!propsList) return null;
+  const p = propsList.find((q) => q.id === id);
+  return p ? propImages.get(p.src) || null : null;
+}
+
+// Draw a named prop from props.json. Returns false when it is not (yet) available so the
+// caller can fall back to the hand-drawn version.
+export function drawProp(ctx, id, x, y, { flip = false } = {}) {
+  const img = propImage(id);
+  if (!img) return false;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (flip) { ctx.save(); ctx.translate(Math.round(x) + w, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore(); }
+  else ctx.drawImage(img, Math.round(x), Math.round(y), w, h);
+  return true;
+}
+
+export function drawProps(ctx) {
+  if (!propsList) return;
+  for (const p of propsList) {
+    if (p.x == null || p.y == null) continue; // named props are drawn by the rooms
+    const img = propImages.get(p.src);
+    if (!img) continue;
+    const w = p.w || img.naturalWidth, h = p.h || img.naturalHeight;
+    if (p.flip) { ctx.save(); ctx.translate(Math.round(p.x) + w, Math.round(p.y)); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore(); }
+    else ctx.drawImage(img, Math.round(p.x), Math.round(p.y), w, h);
+  }
 }
 
 // ----------------------------------------------------------------- lighting
@@ -856,8 +1065,16 @@ export function drawLighting(ctx, store, t, clawdRoom, botsActive, sleeping) {
 
 // ----------------------------------------------------------------- tap targets
 export const ITEMS = [
-  { id: 'house', spark: ['cpu', 'ram'], rect: [L.roof.eaveX1, L.roof.ridgeY - 2, L.roof.eaveX2 - L.roof.eaveX1, L.roof.eaveY - L.roof.ridgeY + 2], title: 'The house', body: 'The homelab itself, sat in the cupboard. My body.', stats: (s) => ({ host: s.meta.host, uptime: fmtUptime(s.system.uptime), load: s.system.load || '—' }) },
+  { id: 'house', spark: ['cpu', 'ram'], rect: [L.roof.eaveX1, L.roof.ridgeY - 2, 44, 60], title: 'The house', body: 'The homelab itself, sat in the cupboard. My body.', stats: (s) => ({ host: s.meta.host, uptime: fmtUptime(s.system.uptime), load: s.system.load || '—' }) },
   { id: 'panels', spark: ['solar_w', 'load_w'], rect: [L.panels.x - 2, L.panels.y - 10, 100, 20], title: 'Solar panels', body: 'FoxESS. The sun charges the battery in the garage; when it drains to the floor, the lights dim.', stats: (s) => ({ solar: `${s.power.solar_w} W`, load: `${s.power.load_w} W`, grid: `${s.power.grid_w} W` }) },
+  { id: 'retro', rect: [L.crt.x - 4, L.crt.y - 10, 72, 54], title: 'Retro corner', body: 'RetroShelf: the ~4900 games on /mnt. I come up here for a go when there is nothing on.', stats: (s) => ({ games: s.storage.games, 'last played': '—' }) },
+  { id: 'punchbag', rect: [L.punchbag.x - 4, L.punchbag.y - 18, 20, 52], title: 'Punchbag', body: 'For when the gateway dies again. A few rounds and I feel better.', stats: () => ({}) },
+  { id: 'records', rect: [L.recordPlayer.x - 2, L.recordPlayer.y - 24, L.recordPlayer.w + 4, 52], title: 'Record player', body: 'Old tunes. Headphones on, world off.', stats: () => ({}) },
+  { id: 'hammock', rect: [L.hammock.x1 - 2, L.hammock.y - 6, 60, 38], title: 'Hammock', body: 'The best spot in the house for a swing and a think.', stats: () => ({}) },
+  { id: 'telescope', rect: [L.telescope.x - 2, L.skylight.cy - 8, 38, 60], title: 'Telescope', body: 'Plane spotting by day (ADS-B on the RTL-SDR), stars by night.', stats: (s) => ({ planes: s.sdr.planes, last: s.sdr.last_plane ? `${s.sdr.last_plane.callsign}` : '—' }) },
+  { id: 'wardrobe', rect: [L.wardrobe.x - 2, L.wardrobe.y - 2, L.wardrobe.w + 4, L.wardrobe.h + 2], title: 'Wardrobe', body: 'Hats, mostly. I try one on now and then.', stats: () => ({}) },
+  { id: 'whiteboard', rect: [L.whiteboard.x - 2, L.whiteboard.y - 2, L.whiteboard.w + 4, L.whiteboard.h + 6], title: 'Whiteboard', body: 'Where I plan things out. Boxes and arrows, mostly.', stats: () => ({}) },
+  { id: 'bowl', rect: [L.dogBowl.x - 3, L.dogBowl.y - 6, 14, 10], title: "The dog's bowl", body: 'Kept topped up. He eats when nothing is on fire.', stats: () => ({}) },
   { id: 'chimney', spark: ['cpu', 'temp'], rect: [L.chimney.x - 2, L.chimney.y - 14, 16, 40], title: 'Chimney', body: 'Smoke means the CPU is working hard.', stats: (s) => ({ cpu: `${s.system.cpu}%`, temp: `${s.system.temp}°C` }) },
   { id: 'mailbox', rect: [0, 258, 22, 46], title: 'Mailbox', body: 'Your Telegram DMs. The flag goes up when something is waiting for me.', stats: (s) => ({ unread: s.telegram.unread, last: s.telegram.last ? `${s.telegram.last.from}: ${s.telegram.last.text}` : '—' }) },
   { id: 'bird', rect: [L.tree.x - 22, L.tree.canopyY - 22, 50, 64], title: 'Chirpa', body: 'The bird-audio listener. Sings whenever one of the ~79 species is heard in the yard.', stats: (s) => ({ 'species today': s.chirpa.species_today, detections: s.chirpa.detections_today, last: s.chirpa.last ? s.chirpa.last.species : '—' }) },
@@ -871,7 +1088,7 @@ export const ITEMS = [
   { id: 'bed', rect: [L.bed.x - 2, L.bed.y - 2, L.bed.w + 4, 40], title: 'Bed', body: 'Idle means asleep means dreaming: memory consolidation and the nightly diary.', stats: (s) => ({ 'last diary': fmtAgo(s.memory.last_diary), consolidated: fmtAgo(s.memory.last_consolidation), dreaming: s.clawd.dream || '—' }) },
   { id: 'journal', rect: [L.nightstand.x - 2, L.nightstand.y - 16, L.nightstand.w + 4, L.nightstand.h + 16], title: 'Dream journal', body: 'The nightly diary on the nightstand.', stats: (s) => ({ 'last entry': fmtAgo(s.memory.last_diary) }) },
   { id: 'clock', rect: [L.clock.cx - 12, L.clock.cy - 14, 24, 26], title: 'Wall clock', body: 'My cron schedule. Red ticks are the jobs: morning brief, nightly diary, and the watchdogs ticking.', stats: (s, store) => { const n = store.nextCron(); const o = {}; for (const c of s.cron || []) o[c.name] = c.at || `every ${c.every}m`; if (n) o.next = `${n.name} in ${fmtDuration(n.mins)}`; return o; } },
-  { id: 'photos', rect: [L.photoWall.x - 2, L.photoWall.y - 2, 50, 36], title: 'Photo wall', body: 'Immich. My photo memories.', stats: (s) => ({ photos: s.immich.photos, 'last upload': fmtAgo(s.immich.last_upload) }) },
+  { id: 'photos', rect: [L.photoWall.x - 2, L.photoWall.y - 2, 32, 50], title: 'Photo wall', body: 'Immich. My photo memories.', stats: (s) => ({ photos: s.immich.photos, 'last upload': fmtAgo(s.immich.last_upload) }) },
   { id: 'books', rect: [L.bookshelf.x - 2, L.bookshelf.y - 10, L.bookshelf.w + 4, L.bookshelf.h + 10], title: 'Bookshelves', body: 'My memory. Everything I have learned, filed on shelves.', stats: (s) => ({ notes: s.memory.notes, consolidated: fmtAgo(s.memory.last_consolidation) }) },
   { id: 'cabinet', rect: [L.cabinet.x - 2, L.cabinet.y - 10, L.cabinet.w + 4, L.cabinet.h + 10], title: 'Filing cabinet', body: 'My skills, one per drawer.', stats: (s) => ({ skills: s.memory.skills }) },
   { id: 'thermo', spark: ['temp'], rect: [L.thermo.x - 6, L.thermo.y - 10, 16, 44], title: 'Thermometer', body: 'CPU temperature. The fan in the cupboard spins faster as it climbs (fan-adjust.sh).', stats: (s) => ({ temp: `${s.system.temp}°C`, fan: `${s.system.fan}%` }) },

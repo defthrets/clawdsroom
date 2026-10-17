@@ -1,6 +1,6 @@
 // Boot: size the canvas to the screen (integer pixel scale), connect, run the loop, handle taps.
 
-import { W, H, drawSky, drawGround, drawTree, drawMailbox, drawSignpost, drawFrontDoor, drawHouseShell, drawStairs, drawBedroom, drawLibrary, drawLivingRoom, drawOffice, drawGarage, drawLighting, drawHighlight, hitTest } from './scene.js';
+import { W, H, drawSky, drawGround, drawTree, drawMailbox, drawSignpost, drawFrontDoor, drawHouseShell, drawStairs, drawBedroom, drawLibrary, drawLivingRoom, drawOffice, drawGarage, drawLighting, drawHighlight, hitTest, drawLoft, loadProps, drawProps } from './scene.js';
 import { Store } from './state.js';
 import { connect } from './net.js';
 import { Effects } from './effects.js';
@@ -18,6 +18,7 @@ const actors = new Actors(store, effects);
 const hud = new Hud(store, actors);
 
 if (params.has('hour')) store.hourOverride = Number(params.get('hour'));
+loadProps();
 
 // ------------------------------------------------------------------ sizing
 let scale = 1;
@@ -85,6 +86,8 @@ function draw(t) {
   drawLivingRoom(ctx, store, t, anim);
   drawOffice(ctx, store, t, anim);
   drawGarage(ctx, store, t, anim);
+  drawLoft(ctx, store, t, anim);
+  drawProps(ctx);
   drawFrontDoor(ctx, actors.clawd.floor === 'outside' && actors.clawd.x < 90);
   drawMailbox(ctx, Number(s.telegram.unread || 0), Number(s.telegram.unread || 0) > 0 || actors.envelopes.length > 0);
   drawSignpost(ctx, s.network.wan !== false, day);
