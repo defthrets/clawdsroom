@@ -42,8 +42,8 @@ export const L = {
   bed: { x: 80, y: 152, w: 72 },
   nightstand: { x: 156, y: 172, w: 18, h: 18 },
   clock: { cx: 202, cy: 124, r: 9 },
-  wardrobe: { x: 182, y: 138, w: 32, h: 52 },
-  guitar: { x: 214, y: 160 },
+  wardrobe: { x: 182, y: 144, w: 28, h: 46 },
+  guitar: { x: 210, y: 158 },
   photoWall: { x: 256, y: 112, cols: 2, rows: 3, fw: 12, fh: 10, gap: 4 },
   bookshelf: { x: 296, y: 118, w: 42, h: 72, shelves: 5 },
   cabinet: { x: 344, y: 150, w: 18, h: 40 },
@@ -56,7 +56,7 @@ export const L = {
   cupboard: { x: 370, y: 232, w: 18, h: 68 },
   speaker: { x: 374, y: 220, w: 10, h: 12 },
   thermo: { x: 300, y: 206, h: 26 },
-  whiteboard: { x: 310, y: 205, w: 52, h: 29 },
+  whiteboard: { x: 310, y: 206, w: 51, h: 30 },
   dogBowl: { x: 287, y: 296 },
   broom: { x: 393, y: 262 },
   garageShelf: { x: 394, y: 204, w: 62, h: 30 },
@@ -70,13 +70,13 @@ export const L = {
   // the loft
   telescope: { x: 106, y: 52 },
   skylight: { cx: 110, cy: 48, r: 5 },
-  crt: { x: 151, y: 56, w: 32, h: 30 },
-  crate: { x: 148, y: 86, w: 36, h: 14 },
-  beanbag: { x: 184, y: 70, w: 32, seatY: 86 },
-  recordPlayer: { x: 218, y: 72, w: 22 },
-  poster: { x: 216, y: 50 },
-  punchbag: { x: 254, y: 64, w: 11, h: 31 },
-  hammock: { x1: 300, x2: 356, y: 69, sag: 18, seatY: 86 },
+  crt: { x: 147, y: 54, w: 32, h: 32 },
+  crate: { x: 146, y: 86, w: 34, h: 14 },
+  beanbag: { x: 182, y: 68, w: 32, seatY: 86 },
+  recordPlayer: { x: 216, y: 76, w: 24 },
+  poster: { x: 214, y: 50 },
+  punchbag: { x: 254, y: 64, w: 15, h: 30 },
+  hammock: { x1: 302, x2: 354, y: 68, sag: 18, seatY: 87 },
 };
 
 // Where Clawd goes for each activity (feet x, floor, facing).
@@ -413,13 +413,13 @@ export function drawBedroom(ctx, store, t, anim) {
   drawClock(ctx, store, t, anim.clockShake);
   // wardrobe with a mirror on the door (+ the guitar leaning next to it)
   const wd = L.wardrobe;
-  if (!drawProp(ctx, 'wardrobe', wd.x, wd.y)) {
+  if (!drawPropBottom(ctx, 'wardrobe', wd.x, L.feet.upper)) {
     box(ctx, wd.x, wd.y, wd.w, wd.h, C.wood, C.outline, C.woodLt, C.woodDk);
     rect(ctx, wd.x + Math.floor(wd.w / 2), wd.y + 2, 1, wd.h - 4, C.woodDk);
     rect(ctx, wd.x + 3, wd.y + 6, 9, 30, '#bfdbfe'); outline(ctx, wd.x + 3, wd.y + 6, 9, 30, '#93c5fd');
   }
-  if (anim.wardrobeOpen) { rect(ctx, wd.x + 17, wd.y + 4, 12, wd.h - 10, '#2a1b12'); for (let i = 0; i < 3; i++) rect(ctx, wd.x + 19, wd.y + 9 + i * 12, 8, 3, ['#ef4444', '#2563eb', '#fde047'][i]); }
-  if (!anim.guitarAway) { if (!drawProp(ctx, 'guitar', L.guitar.x, L.guitar.y)) { rect(ctx, L.guitar.x + 5, L.guitar.y, 3, 18, '#78350f'); disc(ctx, L.guitar.x + 6, L.guitar.y + 24, 6, '#b45309'); } }
+  if (anim.wardrobeOpen) { const wh = (propSize('wardrobe') || wd).h; const wy = L.feet.upper - wh; rect(ctx, wd.x + 17, wy + 4, 12, wh - 10, '#2a1b12'); for (let i = 0; i < 3; i++) rect(ctx, wd.x + 19, wy + 9 + i * 12, 8, 3, ['#ef4444', '#2563eb', '#fde047'][i]); }
+  if (!anim.guitarAway) { if (!drawPropBottom(ctx, 'guitar', L.guitar.x, L.feet.upper)) { rect(ctx, L.guitar.x + 5, L.guitar.y, 3, 18, '#78350f'); disc(ctx, L.guitar.x + 6, L.guitar.y + 24, 6, '#b45309'); } }
   // poster
   box(ctx, 118, 112, 18, 22, '#1e1b4b', C.white);
   disc(ctx, 127, 121, 4, '#b196ff'); px(ctx, 125, 120, '#fff'); px(ctx, 129, 120, '#fff');
@@ -934,52 +934,66 @@ export function drawLoft(ctx, store, t, anim) {
   // arcade poster on the back wall
   const po = L.poster;
   if (!drawProp(ctx, 'poster', po.x, po.y)) { box(ctx, po.x, po.y, 22, 22, '#1e1b4b', C.white); text(ctx, 'PLAY', po.x + 3, po.y + 8, '#c4b5fd'); }
-  // telescope (flipped: lens up-left to the skylight)
+  // telescope (flipped: lens up-left to the skylight), feet on the floor
   const te = L.telescope;
-  if (!drawProp(ctx, 'telescope', te.x, te.y, { flip: true })) {
+  if (!drawPropBottom(ctx, 'telescope', te.x, L.feet.loft, { flip: true })) {
     line(ctx, te.x + 16, 100, te.x + 11, 86, '#64748b'); line(ctx, te.x + 16, 100, te.x + 21, 86, '#64748b'); line(ctx, te.x + 16, 99, te.x + 16, 86, '#94a3b8');
     line(ctx, te.x + 16, 86, sk.cx + 2, sk.cy + 5, '#1f2937'); line(ctx, te.x + 17, 86, sk.cx + 3, sk.cy + 5, '#374151');
   }
   px(ctx, sk.cx + 2, sk.cy + 4, anim.scopeOn ? '#7dd3fc' : '#0ea5e9');
-  // retro corner: crate, CRT + console, beanbag
+  // retro corner: crate on the floor, TV and console standing on it, beanbag beside
   const cr = L.crate, tv = L.crt;
   box(ctx, cr.x, cr.y, cr.w, cr.h, '#a16207', C.outline, '#d4a24c', '#78350f');
   rect(ctx, cr.x + 2, cr.y + 2, cr.w - 4, 1, '#78350f'); rect(ctx, cr.x + 2, cr.y + cr.h - 3, cr.w - 4, 1, '#78350f');
-  const hasCrt = drawProp(ctx, 'crt', tv.x, tv.y);
-  const scx = hasCrt ? tv.x + 8 : tv.x + 3, scy = hasCrt ? tv.y + 4 : tv.y + 3, scw = hasCrt ? 15 : tv.w - 8, sch = hasCrt ? 10 : tv.h - 6;
+  const tvSize = propSize('crt');
+  const tvTop = tvSize ? cr.y - tvSize.h : tv.y;
+  const hasCrt = drawPropBottom(ctx, 'crt', tv.x, cr.y) > 0;
   if (!hasCrt) box(ctx, tv.x, tv.y, tv.w, tv.h, '#cbd5e1', C.outline, '#f1f5f9', '#94a3b8');
+  const conSize = propSize('console');
+  if (conSize) drawPropBottom(ctx, 'console', cr.x + Math.round((cr.w - conSize.w) / 2), L.feet.loft);
+  // the game on the screen: the screen is the middle of the TV face
+  const scx = hasCrt ? tv.x + Math.round(tvSize.w * 0.22) : tv.x + 3, scy = hasCrt ? tvTop + Math.round(tvSize.h * 0.2) : tv.y + 3;
+  const scw = hasCrt ? Math.round(tvSize.w * 0.56) : tv.w - 8, sch = hasCrt ? Math.round(tvSize.h * 0.42) : tv.h - 6;
   if (anim.retroOn) {
     rect(ctx, scx, scy, scw, sch, '#0f172a');
     const k = Math.floor(t * 2);
     const cols = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
-    for (let c = 0; c < 5; c++) { const h = 1 + ((c * 7 + k) % 3); for (let yy = 0; yy < h; yy++) rect(ctx, scx + 1 + c * 3, scy + sch - 1 - yy * 2, 2, 2, cols[(c + yy) % cols.length]); }
-    const fx = scx + 1 + ((k * 3) % 5) * 3, fy = scy + 1 + (Math.floor(t * 6) % 3) * 2;
+    const ncol = Math.max(3, Math.floor((scw - 2) / 3));
+    for (let c = 0; c < ncol; c++) { const h = 1 + ((c * 7 + k) % 3); for (let yy = 0; yy < h; yy++) rect(ctx, scx + 1 + c * 3, scy + sch - 1 - yy * 2, 2, 2, cols[(c + yy) % cols.length]); }
+    const fx = scx + 1 + ((k * 3) % ncol) * 3, fy = scy + 1 + (Math.floor(t * 6) % 3) * 2;
     rect(ctx, fx, fy, 2, 2, '#fde047');
-    if (Math.floor(t * 4) % 8 === 0) text(ctx, 'GO', scx + 4, scy + 1, '#ffffff');
+    if (Math.floor(t * 4) % 8 === 0 && scw >= 12) text(ctx, 'GO', scx + Math.round(scw / 2) - 3, scy + 1, '#ffffff');
   } else if (!hasCrt) {
     rect(ctx, scx, scy, scw, sch, '#1e293b'); px(ctx, scx + 1, scy + 1, '#334155');
   }
   const bb = L.beanbag;
-  if (!drawProp(ctx, 'beanbag', bb.x, bb.y)) { for (let yy = 0; yy < 12; yy++) { const w = Math.round(bb.w * Math.sin(Math.PI * (0.2 + 0.8 * (yy / 12)) / 1.6) + 6); rect(ctx, bb.x + Math.floor((bb.w - w) / 2), L.feet.loft - 12 + yy, w, 1, yy < 2 ? '#16a34a' : '#15803d'); } }
-  textCentered(ctx, `${fmtCount(s.storage.games || 0)} GAMES`, tv.x + tv.w / 2, tv.y - 7, '#fde68a');
-  // record player
+  const bbh = drawPropBottom(ctx, 'beanbag', bb.x, L.feet.loft);
+  if (bbh) bb.seatY = L.feet.loft - Math.round(bbh * 0.45);
+  else { for (let yy = 0; yy < 12; yy++) { const w = Math.round(bb.w * Math.sin(Math.PI * (0.2 + 0.8 * (yy / 12)) / 1.6) + 6); rect(ctx, bb.x + Math.floor((bb.w - w) / 2), L.feet.loft - 12 + yy, w, 1, yy < 2 ? '#16a34a' : '#15803d'); } bb.seatY = L.feet.loft - 8; }
+  textCentered(ctx, `${fmtCount(s.storage.games || 0)} GAMES`, cr.x + cr.w / 2, tvTop - 7, '#fde68a');
+  // record player on its table
   const rp = L.recordPlayer;
-  if (!drawProp(ctx, 'recordplayer', rp.x, rp.y)) {
+  const rph = drawPropBottom(ctx, 'recordplayer', rp.x, L.feet.loft);
+  if (!rph) {
     box(ctx, rp.x, rp.y + 12, rp.w, 16, C.wood, C.outline, C.woodLt, C.woodDk);
     box(ctx, rp.x + 1, rp.y + 6, rp.w - 2, 6, '#374151', C.outline, '#4b5563');
     disc(ctx, rp.x + 8, rp.y + 9, 3, '#111827');
   }
-  if (anim.recordOn) { const a = t * 6; px(ctx, rp.x + 9 + Math.round(Math.cos(a) * 3), rp.y + 10 + Math.round(Math.sin(a) * 2), '#ef4444'); }
+  if (anim.recordOn) { const a = t * 6; const cy = L.feet.loft - (rph || 28) + 5; px(ctx, rp.x + 9 + Math.round(Math.cos(a) * 3), cy + Math.round(Math.sin(a) * 2), '#ef4444'); }
   // punchbag hanging from the ridge beam
   const pb = L.punchbag;
   const sway = anim.punch > 0 ? Math.round(Math.sin(t * 14) * 2) : 0;
-  rect(ctx, pb.x + 5 + Math.round(sway / 2), 46, 2, pb.y - 46, '#64748b');
+  const pbSize = propSize('punchbag');
+  rect(ctx, pb.x + Math.round((pbSize ? pbSize.w : 11) / 2) + Math.round(sway / 2), 46, 2, pb.y - 46, '#64748b');
   if (!drawProp(ctx, 'punchbag', pb.x + sway, pb.y)) box(ctx, pb.x + sway + 1, pb.y, 9, pb.h, '#b91c1c', C.outline, '#ef4444', '#7f1d1d');
-  // hammock between two posts
+  // hammock between two posts, posts on the floor
   const hm = L.hammock;
-  if (!drawProp(ctx, 'hammock', hm.x1, hm.y)) {
+  const hmh = drawPropBottom(ctx, 'hammock', hm.x1, L.feet.loft);
+  if (hmh) hm.seatY = L.feet.loft - Math.round(hmh * 0.42);
+  else {
     rect(ctx, hm.x1 - 2, hm.y - 4, 3, L.feet.loft - hm.y + 4, '#5a3d2c'); rect(ctx, hm.x2, hm.y - 4, 3, L.feet.loft - hm.y + 4, '#5a3d2c');
     for (let x = hm.x1; x <= hm.x2; x++) { const k = (x - hm.x1) / (hm.x2 - hm.x1); const y = hm.y + Math.round(Math.sin(Math.PI * k) * hm.sag); px(ctx, x, y, '#f59e0b'); px(ctx, x, y + 1, '#d97706'); }
+    hm.seatY = 86;
   }
   // ladder down to the library
   drawLadder(ctx);
@@ -1018,6 +1032,20 @@ export function drawProp(ctx, id, x, y, { flip = false } = {}) {
   if (flip) { ctx.save(); ctx.translate(Math.round(x) + w, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore(); }
   else ctx.drawImage(img, Math.round(x), Math.round(y), w, h);
   return true;
+}
+
+// Draw a named prop with its bottom edge on `bottom` (the floor line), left edge at x.
+// Returns the drawn height, or 0 when the image is not available.
+export function drawPropBottom(ctx, id, x, bottom, { flip = false } = {}) {
+  const img = propImage(id);
+  if (!img) return 0;
+  drawProp(ctx, id, x, bottom - img.naturalHeight, { flip });
+  return img.naturalHeight;
+}
+
+export function propSize(id) {
+  const img = propImage(id);
+  return img ? { w: img.naturalWidth, h: img.naturalHeight } : null;
 }
 
 export function drawProps(ctx) {

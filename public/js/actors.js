@@ -54,7 +54,7 @@ const ACTIVITY_SPOTS = {
   delegating: { x: 402, floor: 'lower', face: 1 },
   planning: { x: 300, floor: 'lower', face: 1 },
   deploying: { x: 358, floor: 'lower', face: 1 },
-  playing: { x: 186, floor: 'loft', face: -1, sit: 'beanbag' },
+  playing: { x: 198, floor: 'loft', face: -1, sit: 'beanbag' },
 };
 const IDLE_HOME = { x: 100, floor: 'lower' };
 
@@ -101,12 +101,12 @@ export const PASTIMES = [
   { id: 'photos', phrase: 'looking at the photo wall', go: 'off to the photo wall', x: 270, floor: 'upper', face: 1, act: 'lookup', dur: [5, 12], when: ['day', 'evening'], lines: ['Good times.', 'Remember that?', 'Nice one of you.'] },
   { id: 'books', phrase: 'browsing the bookshelf', go: 'off to the bookshelf', x: 282, floor: 'upper', face: 1, act: 'browse', dur: [6, 12], when: ['day', 'evening'], lines: ['Where did I put that...', 'Ah, there it is.'] },
   // loft
-  { id: 'retro', phrase: 'playing retro games', go: 'off up to the loft for a game', x: 200, floor: 'loft', face: -1, sit: 'beanbag', act: 'game', dur: [20, 45], when: ['day', 'evening', 'night'], lines: ['One more level.', '4900 games and nothing to play.', 'High score!'] },
+  { id: 'retro', phrase: 'playing retro games', go: 'off up to the loft for a game', x: 198, floor: 'loft', face: -1, sit: 'beanbag', act: 'game', dur: [20, 45], when: ['day', 'evening', 'night'], lines: ['One more level.', '4900 games and nothing to play.', 'High score!'] },
   { id: 'guitar', phrase: 'strumming the guitar', go: 'off to get the guitar', x: 126, floor: 'upper', face: 1, sit: 'bed', act: 'guitar', dur: [10, 20], when: ['evening', 'night'], lines: ['♪ ♪', 'Still learning this one.'] },
   { id: 'hammock', phrase: 'swinging in the hammock', go: 'off up to the hammock', x: 328, floor: 'loft', face: 1, sit: 'hammock', act: 'swing', dur: [20, 50], when: ['day', 'evening'], lines: ['Bliss.', 'Just five minutes.'] },
   { id: 'telescope', phrase: 'at the telescope', go: 'off up to the telescope', x: 148, floor: 'loft', face: -1, act: 'scope', dur: [8, 16], when: ['evening', 'night', 'day'], lines: ['SKY'] },
-  { id: 'punchbag', phrase: 'letting off steam', go: 'off up to the punchbag', x: 278, floor: 'loft', face: -1, act: 'punch', dur: [6, 12], when: ['day', 'evening'], lines: ['Take that, gateway.', 'Hyah!'] },
-  { id: 'records', phrase: 'playing a record', go: 'off up to put a record on', x: 200, floor: 'loft', face: 1, sit: 'beanbag', act: 'record', dur: [12, 24], when: ['evening', 'night'], lines: ['Tune.', 'Side B.'] },
+  { id: 'punchbag', phrase: 'letting off steam', go: 'off up to the punchbag', x: 280, floor: 'loft', face: -1, act: 'punch', dur: [6, 12], when: ['day', 'evening'], lines: ['Take that, gateway.', 'Hyah!'] },
+  { id: 'records', phrase: 'playing a record', go: 'off up to put a record on', x: 198, floor: 'loft', face: 1, sit: 'beanbag', act: 'record', dur: [12, 24], when: ['evening', 'night'], lines: ['Tune.', 'Side B.'] },
   { id: 'boxes', phrase: 'rummaging through the downloads', go: 'off to the garage shelves', x: 404, floor: 'lower', face: 1, act: 'rummage', dur: [6, 12], when: ['day'], lines: ['What is all this?', 'Old downloads.', 'Ooh, forgot about this.'] },
   // outside
   { id: 'mailbox', phrase: 'checking the post', go: 'off to check the post', x: 26, floor: 'outside', face: -1, act: 'mail', dur: [4, 8], when: ['morning', 'day'], lines: ['MAIL'] },
@@ -609,7 +609,7 @@ export class Actors {
       case 'guitar': c.guitar = true; a.guitarAway = true; if (tick(0.7)) this.fx.note(c.x + randInt(-8, 8), c.y - 24); break;
       case 'record': a.recordOn = true; c.headphones = true; if (tick(0.8)) this.fx.note(L.recordPlayer.x + randInt(2, 16), L.recordPlayer.y - 12); break;
       case 'punch':
-        if (tick(0.55)) { c.punching = 0.25; a.punch = 0.5; this.fx.add({ x: L.punchbag.x + 12, y: L.punchbag.y + randInt(6, 18), life: 0.35, draw: (g, q, k) => { if (k < 0.7) text(g, 'POW', q.x - 8, q.y - 2 - k * 4, '#fde047'); } }); }
+        if (tick(0.55)) { c.punching = 0.25; a.punch = 0.5; this.fx.add({ x: L.punchbag.x + 14, y: L.punchbag.y + randInt(6, 18), life: 0.35, draw: (g, q, k) => { if (k < 0.7) text(g, 'POW', q.x - 8, q.y - 2 - k * 4, '#fde047'); } }); }
         break;
       case 'scope': a.scopeOn = true; c.lookUp = 0.5; break;
       case 'rummage': c.lookUp = 0.5; if (tick(0.9)) this.fx.add({ x: L.garageShelf.x + randInt(4, 56), y: L.garageShelf.y + 14, life: 0.7, vx: rand(-10, 10), vy: -20, draw: (g, q) => px(g, q.x, q.y, pick(['#fde68a', '#a16207', '#e5e7eb'])) }); break;

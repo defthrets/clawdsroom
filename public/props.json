@@ -1,5 +1,6 @@
 [
   { "id": "crt", "src": "/sprites/crt.png" },
+  { "id": "console", "src": "/sprites/console.png" },
   { "id": "beanbag", "src": "/sprites/beanbag.png" },
   { "id": "hammock", "src": "/sprites/hammock.png" },
   { "id": "telescope", "src": "/sprites/telescope.png" },
