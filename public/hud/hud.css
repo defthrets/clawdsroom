@@ -425,3 +425,6 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .scan::after, .logo, .alert, .panel h2 i, .cm-ptt::before { animation: none; }
 }
+.agent.offline .ag-dot { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+.dots { align-items: center; }
+.dots .prog { margin-left: 6px; font-size: 9.5px; letter-spacing: 0.1em; color: var(--warn); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

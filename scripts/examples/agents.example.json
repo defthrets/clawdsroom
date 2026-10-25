@@ -1,20 +1,10 @@
 {
   "clawd": {
     "label": "Clawd",
-    "type": "openai",
-    "url": "http://127.0.0.1:18789/v1/chat/completions",
-    "key": "$OPENCLAW_GATEWAY_TOKEN",
-    "model": "openclaw:main",
-    "user": "clawd-hud",
-    "voice": "Daniel"
-  },
-  "hermes": {
-    "label": "Hermes",
-    "type": "openai",
-    "url": "http://127.0.0.1:8642/v1/chat/completions",
+    "type": "hermes",
+    "url": "http://127.0.0.1:8642",
     "key": "$HERMES_API_SERVER_KEY",
-    "model": "hermes-agent",
-    "history": 10,
-    "voice": "Samantha"
+    "session": "clawd-hud",
+    "voice": "Daniel"
   }
 }

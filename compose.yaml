@@ -18,8 +18,9 @@ services:
       # - TLS_CERT=/data/tls/cert.pem
       # - TLS_KEY=/data/tls/key.pem
       # - STT_URL=http://speaches:8000/v1/audio/transcriptions
-      # - OPENCLAW_GATEWAY_TOKEN=...
-      # - HERMES_API_SERVER_KEY=...
+      # - HERMES_API_SERVER_KEY=...   (Hermes Agent's API_SERVER_KEY; with the port mapping above,
+      #   use "url": "http://host.docker.internal:8642" in data/agents.json and add
+      #   extra_hosts: ["host.docker.internal:host-gateway"], or use network_mode: host)
     volumes:
       - ./data:/data
       - /:/host/root:ro

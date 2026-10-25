@@ -1,4 +1,4 @@
-// The HUD's voice link: hold to talk to Clawd or Hermes (or leave a voice note), read the thread,
+// The HUD's voice link: hold to talk to Clawd (Hermes Agent) or leave a voice note, read the thread,
 // hear the replies. Recording needs a secure page (HTTPS) on the iPad; typing works anywhere.
 
 const AUTO_CLOSE_MS = 90000;
@@ -22,7 +22,7 @@ export function initComms(store, { $, params }) {
     level: $('cm-level'), cancel: $('cm-cancel'), hint: $('cm-hint'), live: $('cm-live'), input: $('cm-input'),
     sendBtn: $('cm-send'), speak: $('cm-speak'), badge: $('comms-badge'),
   };
-  let agents = [{ id: 'clawd', label: 'Clawd', ready: false }, { id: 'hermes', label: 'Hermes', ready: false }];
+  let agents = [{ id: 'clawd', label: 'Clawd', ready: false }];
   let current = 'clawd';
   let mode = 'talk';
   let speakReplies = true;
@@ -58,7 +58,7 @@ export function initComms(store, { $, params }) {
 
   // ------------------------------------------------------------ agents
   async function loadAgents() {
-    if (store.mode === 'demo') { agents = agents.map((a) => ({ ...a, ready: true, type: 'demo' })); renderAgents(); return; }
+    if (store.mode === 'demo') { agents = agents.map((a) => ({ ...a, ready: true, type: 'hermes', online: true })); renderAgents(); return; }
     try {
       const r = await fetch('/api/comms/agents', { cache: 'no-store' });
       if (r.ok) { const list = await r.json(); if (Array.isArray(list) && list.length) agents = list; }
@@ -70,9 +70,12 @@ export function initComms(store, { $, params }) {
 
   function renderAgents() {
     ui.agents.innerHTML = agents.map((a) => {
-      const thinking = log().some((e) => e.to === a.id && (e.status === 'thinking' || e.status === 'sending' || e.status === 'transcribing'));
-      const sub = thinking ? 'THINKING…' : a.ready ? `LINKED · ${String(a.type || '').toUpperCase()}` : 'NO LINK · QUEUES';
-      return `<button class="agent${a.id === current ? ' sel' : ''}${a.ready ? ' ready' : ''}${thinking ? ' busy' : ''}${speakingAgent === a.id ? ' talking' : ''}" data-id="${esc(a.id)}">
+      const busy = log().find((e) => e.to === a.id && (e.status === 'thinking' || e.status === 'sending' || e.status === 'transcribing'));
+      const thinking = !!busy;
+      const link = a.type === 'hermes' ? 'HERMES AGENT' : String(a.type || '').toUpperCase();
+      const offline = a.ready && a.online === false;
+      const sub = thinking ? (busy.progress ? `⚙ ${esc(String(busy.progress).toUpperCase())}` : 'THINKING…') : offline ? `OFFLINE · ${link}` : a.ready ? `LINKED · ${link}` : 'NO LINK · QUEUES';
+      return `<button class="agent${a.id === current ? ' sel' : ''}${a.ready && !offline ? ' ready' : ''}${offline ? ' offline' : ''}${thinking ? ' busy' : ''}${speakingAgent === a.id ? ' talking' : ''}" data-id="${esc(a.id)}">
         <span class="ag-dot"></span><span class="ag-name">${esc(String(a.label || a.id).toUpperCase())}</span><span class="ag-sub">${sub}</span></button>`;
     }).join('');
   }
@@ -109,7 +112,7 @@ export function initComms(store, { $, params }) {
     const agent = agents.find((a) => a.id === current) || { id: current, label: current };
     ui.title.textContent = String(agent.label || current).toUpperCase();
     const items = log().filter((e) => e.to === current || e.from === current).slice(-30);
-    const key = JSON.stringify(items.map((e) => [e.id, e.status, e.text, e.audio]));
+    const key = JSON.stringify(items.map((e) => [e.id, e.status, e.text, e.audio, e.progress]));
     if (!force && key === threadKey) return;
     threadKey = key;
     if (!items.length) {
@@ -127,7 +130,7 @@ export function initComms(store, { $, params }) {
         <div class="msg-meta">${who}${kind} · ${hms(e.at)}${st ? ` · <b class="st-${esc(e.status)}">${esc(st)}</b>` : ''}</div>
         <div class="msg-body">${src ? `<button class="play" data-src="${esc(src)}">▶</button>` : ''}<span>${esc(e.text || (src ? '(voice, no transcript)' : ''))}</span></div>
         ${e.error ? `<div class="msg-err">${esc(e.error)}</div>` : ''}
-        ${thinking && mine ? '<div class="dots"><i></i><i></i><i></i></div>' : ''}
+        ${thinking && mine ? `<div class="dots"><i></i><i></i><i></i>${e.progress ? `<span class="prog">⚙ ${esc(e.progress)}</span>` : ''}</div>` : ''}
       </div>`;
     }).join('');
     ui.thread.scrollTop = ui.thread.scrollHeight;
@@ -196,17 +199,18 @@ export function initComms(store, { $, params }) {
   // Demo mode has no server: fake the round trip so the console can be tried.
   function demoExchange({ text }) {
     const id = `d${Date.now().toString(36)}`;
-    const entry = { id, at: Date.now(), from: 'you', to: current, kind: mode, text, status: 'thinking' };
+    const entry = { id, at: Date.now(), from: 'you', to: current, kind: mode, text, status: 'sending' };
     const put = (e) => store.patch({ comms: { log: [...log().filter((x) => x.id !== e.id), e].slice(-60) } });
+    const who = current, note = mode === 'note';
     put(entry);
-    const who = current;
+    setTimeout(() => put({ ...entry, status: 'thinking', progress: 'terminal: checking the dish' }), 700);
     setTimeout(() => {
       put({ ...entry, status: 'delivered' });
-      const lines = mode === 'note'
+      const lines = note
         ? ['Got your voice note. I will pick it up shortly.', 'Noted. I will get on it.']
         : ['Copy that. Everything looks quiet on the homelab.', 'On it. Starlink is holding steady.', 'Roger. I will keep an eye on it.'];
       put({ id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: lines[Math.floor(Math.random() * lines.length)], status: 'received' });
-    }, 1800);
+    }, 2600);
   }
 
   // ------------------------------------------------------------ recording

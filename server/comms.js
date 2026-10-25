@@ -1,17 +1,18 @@
-// Comms: talk to the agents from the HUD. You hold to talk (or leave a voice note); the server
-// keeps the audio, transcribes it if it can, hands it to the agent and puts the reply back in
-// the thread, spoken aloud on the HUD.
+// Comms: talk to Clawd from the HUD. You hold to talk (or leave a voice note); the server keeps the
+// audio, transcribes it if it can, hands it to the agent and puts the reply back in the thread,
+// spoken aloud on the HUD.
 //
-// Agents are configured in data/agents.json (AGENTS_FILE), re-read whenever it changes:
+// Clawd runs on Hermes Agent, so the default link is Hermes Agent's API server. Agents are
+// configured in data/agents.json (AGENTS_FILE), re-read whenever it changes:
 //
-//   { "clawd":  { "type": "openai", "url": "http://127.0.0.1:18789/v1/chat/completions", "key": "$OPENCLAW_TOKEN", "model": "openclaw:main" },
-//     "hermes": { "type": "openai", "url": "http://127.0.0.1:8642/v1/chat/completions", "key": "$HERMES_KEY", "model": "hermes-agent", "history": 10 } }
+//   { "clawd": { "type": "hermes", "url": "http://127.0.0.1:8642", "key": "$HERMES_API_SERVER_KEY" } }
 //
-// Types: openai (chat completions; the reply comes straight back), openclaw-hook (POST /hooks/agent,
-// the agent replies later with `room reply`), webhook (our JSON payload; a {reply} in the response
-// counts), command (a shell command; its stdout counts as the reply). "$NAME" strings are read from
-// the environment. Optional speech: STT_URL (OpenAI-style /v1/audio/transcriptions) and
-// TTS_URL (OpenAI-style /v1/audio/speech).
+// Types: hermes (Hermes Agent's /v1/chat/completions with X-Hermes-Session-Id, so Hermes keeps the
+// conversation; streamed, so tool progress shows on the HUD), openai (any other chat-completions
+// endpoint; we send the history), webhook (our JSON payload; a {reply} in the response counts),
+// command (a shell command; its stdout counts as the reply). "$NAME" strings are read from the
+// environment. Optional speech: STT_URL (OpenAI-style /v1/audio/transcriptions) and TTS_URL
+// (OpenAI-style /v1/audio/speech). Hermes Agent's API takes text only, so voice needs a transcript.
 
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -22,7 +23,7 @@ const LOG_MAX = 60;
 const AUDIO_KEEP = 300;
 const EXT = { 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'm4a', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const MIME = { m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav' };
-const DEFAULT_AGENTS = { clawd: { label: 'Clawd' }, hermes: { label: 'Hermes' } };
+const DEFAULT_AGENTS = { clawd: { label: 'Clawd' } };
 
 export const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
@@ -68,6 +69,84 @@ async function fetchJson(url, opts, timeoutMs) {
   } finally { clearTimeout(timer); }
 }
 
+// Hermes Agent base URL (with an optional multiplexed profile), from whatever form the config gives.
+export function hermesBase(cfg) {
+  const base = String(cfg.url || 'http://127.0.0.1:8642').replace(/\/+$/, '').replace(/\/v1(\/chat\/completions)?$/, '');
+  return cfg.profile ? `${base}/p/${encodeURIComponent(cfg.profile)}` : base;
+}
+
+// One SSE block → {event, data} (data parsed as JSON when it can be).
+export function parseSseBlock(block) {
+  let event = 'message';
+  const data = [];
+  for (const line of block.split(/\r?\n/)) {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+  }
+  if (!data.length) return null;
+  const raw = data.join('\n');
+  try { return { event, data: JSON.parse(raw), raw }; } catch { return { event, data: null, raw }; }
+}
+
+// A short label for a Hermes tool-progress event, whatever shape it comes in.
+export function progressLabel(d) {
+  if (!d || typeof d !== 'object') return '';
+  const p = d.progress || d.tool_progress || d;
+  const name = p.tool || p.tool_name || p.name || p.function || '';
+  const what = p.label || p.message || p.status || p.summary || '';
+  return String([name, what].filter(Boolean).join(': ')).slice(0, 80);
+}
+
+// POST a streamed chat completion to Hermes Agent; returns the reply text. onProgress(label) as tools run.
+// The timeout is for silence, not the whole turn: Hermes sends keepalives while it works.
+export async function hermesChat(url, { key, session, sessionKey, model, messages }, { idleMs = 300000, onProgress = () => {} } = {}) {
+  const ac = new AbortController();
+  let timer = setTimeout(() => ac.abort(), idleMs);
+  const poke = () => { clearTimeout(timer); timer = setTimeout(() => ac.abort(), idleMs); };
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      signal: ac.signal,
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+        ...(session ? { 'X-Hermes-Session-Id': session } : {}),
+        ...(sessionKey ? { 'X-Hermes-Session-Key': sessionKey } : {}),
+      },
+      body: JSON.stringify({ model: model || 'hermes-agent', messages, stream: true }),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 160)}`);
+    if (!/event-stream/.test(r.headers.get('content-type') || '')) {
+      const j = await r.json();
+      return j.choices?.[0]?.message?.content ?? '';
+    }
+    let text = '', buf = '';
+    const dec = new TextDecoder();
+    for await (const chunk of r.body) {
+      poke();
+      buf += dec.decode(chunk, { stream: true });
+      let i;
+      while ((i = buf.search(/\r?\n\r?\n/)) >= 0) {
+        const block = buf.slice(0, i);
+        buf = buf.slice(i).replace(/^\r?\n\r?\n/, '');
+        const ev = parseSseBlock(block);
+        if (!ev) continue;
+        if (ev.raw === '[DONE]') return text;
+        const d = ev.data;
+        if (/tool\.progress/.test(ev.event) || /tool\.progress/.test(String(d?.object || d?.type || ''))) { onProgress(progressLabel(d)); continue; }
+        const ch = d?.choices?.[0];
+        if (!ch) continue;
+        if (ch.delta?.content) text += ch.delta.content;
+        if (ch.finish_reason === 'error' || ch.finish_reason === 'cancelled') throw new Error(`Hermes ended the turn: ${ch.finish_reason}`);
+      }
+    }
+    return text;
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? `no word from Hermes for ${Math.round(idleMs / 1000)}s` : e.message);
+  } finally { clearTimeout(timer); }
+}
+
 export class Comms {
   // hooks: getState(), patch(patch), event(ev)
   constructor({ dataDir, agentsFile, hooks, env = process.env }) {
@@ -76,6 +155,7 @@ export class Comms {
     this.hooks = hooks;
     this.env = env;
     this.cache = { mtime: -1, agents: DEFAULT_AGENTS };
+    this.health = new Map(); // agent id → {at, online}
   }
 
   // ------------------------------------------------------------ config
@@ -97,9 +177,24 @@ export class Comms {
     return this.cache.agents;
   }
 
-  // Safe to show the HUD: no urls or keys.
-  publicAgents() {
-    return Object.entries(this.agents()).map(([id, a]) => ({ id, label: a.label, ready: !!a.type, type: a.type || null, voice: a.voice || null }));
+  // Safe to show the HUD: no urls or keys. For Hermes links, whether its API server answers /health.
+  async publicAgents() {
+    return Promise.all(Object.entries(this.agents()).map(async ([id, a]) => ({
+      id, label: a.label, ready: !!a.type, type: a.type || null, voice: a.voice || null,
+      online: a.type === 'hermes' ? await this.isOnline(id, a) : null,
+    })));
+  }
+
+  async isOnline(id, raw) {
+    const hit = this.health.get(id);
+    if (hit && Date.now() - hit.at < 20000) return hit.online;
+    let online = false;
+    try {
+      const r = await fetch(`${hermesBase(interpolate(raw, this.env))}/health`, { signal: AbortSignal.timeout(2000) });
+      online = r.ok;
+    } catch { /* down */ }
+    this.health.set(id, { at: Date.now(), online });
+    return online;
   }
 
   // ------------------------------------------------------------ the thread
@@ -224,11 +319,27 @@ export class Comms {
 
     const replyCmd = `room reply ${entry.to} "your reply"`;
     const hint = cfg.reply_hint ?? `(Sent from the wall HUD. To answer out loud there, run: ${replyCmd})`;
-    const timeout = Number(cfg.timeout_s || 180) * 1000;
+    const timeout = Number(cfg.timeout_s || 300) * 1000;
     this.update(entry.id, { status: 'thinking' });
 
     let reply = '';
-    if (cfg.type === 'openai') {
+    if (cfg.type === 'hermes') {
+      const messages = [];
+      if (cfg.system) messages.push({ role: 'system', content: cfg.system });
+      messages.push({ role: 'user', content: compose(entry) });
+      let lastProgress = 0;
+      reply = await hermesChat(`${hermesBase(cfg)}/v1/chat/completions`, {
+        key: cfg.key, model: cfg.model, messages,
+        session: cfg.session || `${entry.to}-hud`, sessionKey: cfg.session_key || cfg.session || `${entry.to}-hud`,
+      }, {
+        idleMs: timeout,
+        onProgress: (label) => {
+          if (!label || Date.now() - lastProgress < 700) return;
+          lastProgress = Date.now();
+          this.update(entry.id, { status: 'thinking', progress: label });
+        },
+      });
+    } else if (cfg.type === 'openai') {
       const messages = [];
       if (cfg.system) messages.push({ role: 'system', content: cfg.system });
       messages.push(...chatHistory(this.log().filter((e) => e.id !== entry.id), entry.to, Number(cfg.history || 0)));
@@ -239,12 +350,6 @@ export class Comms {
         body: JSON.stringify({ model: cfg.model || 'default', messages, user: cfg.user || 'clawd-hud', stream: false, ...(cfg.extra || {}) }),
       }, timeout);
       reply = out.choices?.[0]?.message?.content ?? out.text ?? '';
-    } else if (cfg.type === 'openclaw-hook') {
-      await fetchJson(cfg.url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(cfg.key ? { Authorization: `Bearer ${cfg.key}` } : {}), 'Idempotency-Key': entry.id, ...(cfg.headers || {}) },
-        body: JSON.stringify({ message: compose(entry, { replyHint: hint }), name: cfg.name || 'Clawd HUD', ...(cfg.agentId ? { agentId: cfg.agentId } : {}), deliver: cfg.deliver ?? false }),
-      }, timeout);
     } else if (cfg.type === 'webhook') {
       const out = await fetchJson(cfg.url, {
         method: 'POST',
@@ -264,7 +369,7 @@ export class Comms {
     } else {
       throw new Error(`unknown type "${cfg.type}"`);
     }
-    this.update(entry.id, { status: 'delivered' });
+    this.update(entry.id, { status: 'delivered', progress: null });
     reply = String(reply || '').trim();
     if (reply) await this.reply({ from: entry.to, text: reply, replyTo: entry.id });
   }

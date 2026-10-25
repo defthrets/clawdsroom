@@ -109,17 +109,19 @@ status with [grpcurl](https://github.com/fullstorydev/grpcurl) and pushes `starl
 scripts/examples/starlink.sh --loop 5     # every 5s, forever (or cron it once a minute)
 ```
 
-### Talking to Clawd and Hermes from the HUD
+### Talking to Clawd from the HUD
 
-Tap **COMMS** in the HUD's top bar to open the voice link. Pick **CLAWD** or **HERMES**, then either:
+Clawd runs on [Hermes Agent](https://hermes-agent.nousresearch.com/), and the HUD talks to him through Hermes
+Agent's API server. Tap **COMMS** in the HUD's top bar to open the voice link, then either:
 
 ![Comms](docs/hud-comms.png)
 
-* **TALK**: hold the big button and speak (or tap once to start and again to send). The agent's
-  reply appears in the thread and is **read out loud** on the iPad. When a reply arrives, the console
-  opens itself on that agent. Clawd's replies also come out of his mouth in the room.
-* **VOICE NOTE**: the same button leaves a recorded message. The audio is kept and the agent gets it
-  as a voice message with the transcript and a link to the recording.
+* **TALK**: hold the big button and speak (or tap once to start and again to send). Clawd's reply
+  appears in the thread and is **read out loud** on the iPad, and the console opens itself when it
+  arrives. While he works, the tool he is using shows under your message (`⚙ terminal: ...`). His reply
+  also comes out of his mouth in the room.
+* **VOICE NOTE**: the same button leaves a recorded message. The audio is kept and Clawd gets it as a
+  voice message with the transcript and a link to the recording.
 * Or type into the box under the thread.
 
 Every message and reply stays in the thread with a ▶ to play the audio back. The console closes on its
@@ -143,26 +145,38 @@ Setting it up:
    Then open `https://192.168.1.253:8788/hud/` and add *that* to the home screen. Without HTTPS the
    console still works for typing and spoken replies, just not the mic.
 
-2. **Tell the server how to reach the agents.** Copy `scripts/examples/agents.example.json` to
-   `data/agents.json` (picked up live, no restart). Both agents speak OpenAI-style chat completions,
-   so the reply comes straight back:
-   * **Clawd (OpenClaw):** turn on the gateway's HTTP endpoint (`gateway.http.endpoints.chatCompletions.enabled: true`)
-     and use the gateway token as the key. The model `openclaw:main` picks the agent, and the fixed `user` keeps one ongoing
-     session for the HUD.
-   * **Hermes Agent:** its API server on port 8642, with `API_SERVER_KEY` as the key and `hermes-agent` as the model.
-     `history: 10` sends the last ten exchanges along with each message.
+2. **Point it at Hermes Agent.** Turn on Hermes Agent's API server in `~/.hermes/.env`:
 
-   `"key": "$NAME"` reads the key from the environment, so secrets stay out of the file. Other link types:
-   `openclaw-hook` (POST to OpenClaw's `/hooks/agent`; Clawd answers later with `room reply clawd "..."`),
-   `webhook` (gets `{id, to, kind, text, message, audio_url, reply_url}`; a `{"reply": "..."}` in the response counts)
-   and `command` (a shell command with `COMMS_TEXT`, `COMMS_AUDIO`, `COMMS_AUDIO_URL`... in its environment; its
-   stdout is the reply). An agent with no link still gets its messages in the thread, marked queued. It can read them with
-   `room inbox <agent>` and answer with `room reply <agent> "..."`.
+   ```bash
+   API_SERVER_ENABLED=true
+   API_SERVER_KEY=<a long random key>
+   # API_SERVER_HOST=0.0.0.0   only if the room runs on another machine or in Docker (default 127.0.0.1)
+   ```
 
-3. **Speech-to-text and voices (optional).** Safari can transcribe as you speak (it needs Siri & Dictation on, and
+   Restart `hermes gateway` (it should log `API server listening on http://127.0.0.1:8642`). Then copy
+   `scripts/examples/agents.example.json` to `data/agents.json` (it is re-read live, no restart needed) and start the
+   room with `HERMES_API_SERVER_KEY` set to the same key. `"key": "$NAME"` reads keys from the environment, so secrets
+   stay out of the file.
+
+   Each message goes to Hermes Agent's `/v1/chat/completions` with `X-Hermes-Session-Id: clawd-hud`. Hermes keeps
+   the conversation and Clawd's memory itself, so the HUD only sends what you just said. The reply streams back,
+   along with the tool progress. Options on the `clawd` entry: `url` (default `http://127.0.0.1:8642`), `profile` (a
+   multiplexed Hermes profile, sent as `/p/<profile>/...`), `session` (default `clawd-hud`), `system` (an extra
+   system prompt), `timeout_s` (how long Hermes may go silent, default 300). The COMMS card shows **OFFLINE** when
+   Hermes' `/health` doesn't answer.
+
+   Hermes Agent's API takes text, not audio, so voice needs a transcript (step 3). Other link types, for anything
+   else you want on the console as its own entry: `openai` (any other chat-completions endpoint; `history: 10`
+   sends the last ten exchanges), `webhook` (gets `{id, to, kind, text, message, audio_url, reply_url}`; a
+   `{"reply": "..."}` in the response counts) and `command` (a shell command with `COMMS_TEXT`, `COMMS_AUDIO`,
+   `COMMS_AUDIO_URL`... in its environment; its stdout is the reply). An entry with no link still gets its messages
+   in the thread, marked queued. It can read them with `room inbox <name>` and answer with `room reply <name> "..."`.
+
+3. **Speech-to-text and voices.** Safari can transcribe as you speak (it needs Siri & Dictation on, and
    doesn't always manage it from a home-screen app). When it does, that text goes with the recording. For transcripts you can count on, point `STT_URL` at any OpenAI-style
    `/v1/audio/transcriptions` endpoint (a local [Speaches](https://github.com/speaches-ai/speaches)/faster-whisper server, or
-   OpenAI with `STT_KEY`), and it will transcribe whatever Safari didn't. Replies are spoken with the iPad's own voices
+   OpenAI with `STT_KEY`), and it will transcribe whatever Safari didn't. If Hermes' own voice mode already runs a faster-whisper setup,
+   a Speaches server is the same engine behind an HTTP API. Replies are spoken with the iPad's own voices
    (set `"voice"` per agent to pick one, e.g. `Daniel`), or set `TTS_URL` (an OpenAI-style `/v1/audio/speech`) and
    `"tts_voice"` per agent for server-made audio.
 
@@ -262,7 +276,8 @@ Environment variables for the server:
 | `DISK_ROOT`, `DISK_MNT` | `/`, `/mnt` | Paths reported as `disk_root` / `disk_mnt`. |
 | `NET_IFACE` | default route | Interface the HUD reports RX/TX for. |
 | `TLS_CERT`, `TLS_KEY`, `HTTPS_PORT` | unset, unset, `8788` | Also serve HTTPS (the HUD's mic needs it). |
-| `AGENTS_FILE` | `data/agents.json` | How to reach Clawd, Hermes and any other agent (see above). |
+| `AGENTS_FILE` | `data/agents.json` | How to reach Clawd (Hermes Agent) and anything else on the comms (see above). |
+| `HERMES_API_SERVER_KEY` | unset | Hermes Agent's `API_SERVER_KEY`, read by the example `agents.json`. |
 | `PUBLIC_URL` | the request's host | Base URL for the audio links handed to agents. |
 | `STT_URL`, `STT_KEY`, `STT_MODEL`, `STT_LANGUAGE` | unset, `whisper-1` | Server-side transcription of voice messages. |
 | `TTS_URL`, `TTS_KEY`, `TTS_MODEL`, `TTS_VOICE` | unset, `tts-1`, `alloy` | Server-side voices for replies. |

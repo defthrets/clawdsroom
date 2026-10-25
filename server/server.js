@@ -273,7 +273,7 @@ async function handle(req, res) {
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, state);
     if (p === '/api/events' && req.method === 'GET') return send(res, 200, state.events || []);
     if (p === '/api/history' && req.method === 'GET') return send(res, 200, history);
-    if (p === '/api/comms/agents' && req.method === 'GET') return send(res, 200, comms.publicAgents());
+    if (p === '/api/comms/agents' && req.method === 'GET') return send(res, 200, await comms.publicAgents());
     if (p === '/api/comms/log' && req.method === 'GET') {
       const who = url.searchParams.get('agent');
       const since = Number(url.searchParams.get('since') || 0);
