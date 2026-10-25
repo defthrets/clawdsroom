@@ -8,9 +8,19 @@ Everything the room shows comes from one JSON document, the **state**, plus a st
 * `PUT  /api/state`  → replace the whole state
 * `POST /api/event`  → push an event `{"type": "...", ...}`
 * `GET  /api/events` → the last 60 events
-* `GET  /api/history` → up to 6h of cpu/ram/temp/disk/battery/solar samples (one per 30s), for the trend charts
+* `GET  /api/history` → up to 6h of cpu/ram/temp/disk/battery/solar/network/Starlink samples (one per 30s), for the trend charts
 * `GET  /api/stream` → Server-Sent Events (`state` and `event` messages). The iPad listens here.
 * `GET  /api/health` → `{ok: true, clients: n}`
+* `GET  /api/comms/agents` → who the HUD can talk to: `[{id, label, ready, type, voice}]`
+* `GET  /api/comms/log?agent=&since=` → the comms thread
+* `POST /api/comms/send` → `{to, kind: talk|note, text}`, a typed message to an agent
+* `POST /api/comms/voice?to=&kind=&text=` → a voice message: the recording as the body (`audio/*`)
+* `POST /api/comms/reply` → `{from, text, audio_url?}` (or an `audio/*` body with `?from=&text=`): an agent answers, spoken on the HUD
+* `GET  /api/comms/audio/<file>` → a stored recording (byte ranges supported)
+* `POST /api/comms/stop` → `{id}`: stop a running turn (and its Hermes run)
+* `POST /api/comms/control` → `{id, choice}` for an approval (`once`, `deny`, ...) or `{id, answer}` for a clarifying question
+* `GET  /api/hermes/overview?agent=clawd` → Hermes Agent's health, capabilities, skills, toolsets, jobs, sessions and models (cached 15s; `&fresh=1`)
+* `POST /api/hermes/jobs/<id>/run|pause|resume?agent=clawd` → control a scheduled job
 
 Defaults live in [`public/js/defaults.js`](../public/js/defaults.js); the server deep-merges
 whatever you send on top of them. Objects merge recursively, arrays and scalars replace,
@@ -55,9 +65,14 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | `sdr.planes`, `sdr.sensors`, `sdr.last_plane` | Radio pings and planes crossing the sky while `planes > 0`. |
 | `cron[]` | `{name, at: "HH:MM"}` or `{name, every: minutes}`. Red ticks on the clock, "next:" in the title bar. |
 | `subagents.active`, `subagents.names` | Lit helper bots in the garage (3 docks, "+N" beyond). |
-| `network.wan`, `network.latency_ms`, `network.devices` | The WWW signpost turns red when `wan` is false. |
+| `network.wan`, `network.latency_ms`, `network.devices` | The WWW signpost turns red when `wan` is false. HUD tile. |
+| `network.iface`, `network.rx_bps`, `network.tx_bps`, `network.rx_total`, `network.tx_total` | HUD: RX/TX (bits/s) on the default-route interface. **Filled automatically** on Linux (`NET_IFACE` to pick another). |
+| `network.conns_in`, `network.conns_out`, `network.listening`, `network.ports[]`, `network.peers[]` | HUD radar and peer list. Established TCP connections: `in` when the local port is one we listen on, otherwise `out`. `peers` are `{ip, port, dir, n, svc, scope: lan\|wan, host?}`, busiest first. **Filled automatically** on Linux. |
+| `starlink.online`, `starlink.state`, `starlink.latency_ms`, `starlink.drop_rate` (0..1), `starlink.down_bps`, `starlink.up_bps` | HUD uplink panel: the numbers, the packet stream in the sky, the charts. Pushed by `scripts/examples/starlink.sh`. |
+| `starlink.obstructed`, `starlink.fraction_obstructed` (0..1), `starlink.snr_ok`, `starlink.gps_sats`, `starlink.azimuth`, `starlink.elevation`, `starlink.uptime`, `starlink.software`, `starlink.hardware`, `starlink.eth_mbps`, `starlink.alerts[]`, `starlink.updated` | HUD chips and alerts. The HUD calls the dish stale when `updated` is more than 2 minutes old. |
 | `crew.<name>.online`, `crew.<name>.emoji` | The crew photo: bright when home, grey when away. |
 | `weather.condition` (`clear`/`cloudy`/`rain`), `weather.sunrise`, `weather.sunset` | Clouds, rain, and when the sky turns. |
+| `comms.log[]` | The HUD's comms thread, newest last (60 kept): `{id, at, from, to, kind: talk\|note\|reply, text, audio?, status, error?, trace?, control?, run?}`. `trace` is the turn's steps, reasoning and partial answer; `control` is an approval or question Hermes is waiting on. Managed by the server, see `server/comms.js`. |
 | `settings.sleep_after_min`, `settings.reload_hours` | Auto-sleep; the page reloads itself every N hours (24). |
 
 ## Events
@@ -83,6 +98,7 @@ Events also bump the related counters in the state (see `applyEvent` in `public/
 | `diary` | `excerpt` | The journal on the nightstand glows. `memory.last_diary` = now, `notes` +1. |
 | `solar` | `note` | Bolt on the battery with the note. |
 | `note` | `text` | Just the ticker (and a bubble if there's text). |
+| `comms` | `from`, `to`, `kind`, `text` | Sent by the server for each comms message and reply (ticker + HUD log). |
 
 Daily counters (`cams.events_today`, `bus.messages_today`, `chirpa.*_today`) reset at midnight (server local time).
 

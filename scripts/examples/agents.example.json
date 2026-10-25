@@ -1,0 +1,10 @@
+{
+  "clawd": {
+    "label": "Clawd",
+    "type": "hermes",
+    "url": "http://127.0.0.1:8642",
+    "key": "$HERMES_API_SERVER_KEY",
+    "session": "clawd-hud",
+    "voice": "Daniel"
+  }
+}

@@ -12,6 +12,8 @@ Environment=PORT=8787
 Environment=DISK_ROOT=/
 Environment=DISK_MNT=/mnt
 # Environment=CLAWDSROOM_TOKEN=change-me
+# Secrets and optional settings (HERMES_API_SERVER_KEY, TLS_CERT, STT_URL, ...) live here, outside git:
+EnvironmentFile=-/opt/clawdsroom/data/room.env
 Restart=always
 RestartSec=3
 User=clawd

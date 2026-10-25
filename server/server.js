@@ -2,27 +2,38 @@
 // Clawd's Room server. Zero dependencies.
 //
 //   GET  /                  the room (open this on the iPad)
+//   GET  /hud/              the ops HUD: homelab, Starlink and connections (the second iPad)
 //   GET  /api/state         full state JSON
 //   POST /api/state         deep-merge a patch into the state (JSON body, or ?dotted.keys=values)
 //   PUT  /api/state         replace the whole state (merged over defaults)
 //   POST /api/event         push an event {type, ...}; also updates counters, see docs/STATE.md
 //   GET  /api/events        recent events
-//   GET  /api/history       recent samples of cpu/ram/temp/battery/solar (for the trend charts)
+//   GET  /api/history       recent samples of cpu/ram/temp/battery/solar/net/starlink (for the trend charts)
 //   GET  /api/stream        Server-Sent Events: "state" and "event" messages
 //   GET  /api/health        {ok: true}
+//   GET  /api/comms/agents  who the HUD can talk to;  GET /api/comms/log  the thread
+//   POST /api/comms/send    {to, kind: talk|note, text}: a typed message to an agent
+//   POST /api/comms/voice   ?to=&kind=&text= with the audio as the body: a voice message
+//   POST /api/comms/reply   {from, text, audio_url?} (or audio body + ?from=&text=): an agent answers
+//   GET  /api/comms/audio/<file>
+//   POST /api/comms/stop {id}  ·  POST /api/comms/control {id, choice | answer}: stop a turn, answer an approval/question
+//   GET  /api/hermes/overview?agent=clawd  ·  POST /api/hermes/jobs/<id>/run|pause|resume: Hermes Agent's system
 //
 // Env: PORT (8787), HOST (0.0.0.0), CLAWDSROOM_TOKEN (optional bearer token for writes),
 //      DATA_DIR (./data), COLLECT_SYSTEM (1 on Linux), DISK_ROOT (/), DISK_MNT (/mnt),
-//      SYSTEM_INTERVAL_MS (10000)
+//      SYSTEM_INTERVAL_MS (10000), HTTPS_PORT (8788) + TLS_CERT + TLS_KEY (serve HTTPS too; the
+//      HUD's microphone needs it), AGENTS_FILE (data/agents.json), PUBLIC_URL, STT_*, TTS_* (server/comms.js)
 
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_STATE } from '../public/js/defaults.js';
-import { applyEvent, clone, coerce, deepMerge, expandDots, isObj } from '../public/js/reducer.js';
+import { applyEvent, clone, coerce, deepMerge, expandDots, historySample, isObj } from '../public/js/reducer.js';
 import { collectSystem } from './system.js';
+import { Comms } from './comms.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -38,6 +49,10 @@ const TOKEN = process.env.CLAWDSROOM_TOKEN || '';
 const COLLECT_SYSTEM = (process.env.COLLECT_SYSTEM ?? (process.platform === 'linux' ? '1' : '0')) === '1';
 const SYSTEM_INTERVAL_MS = Number(process.env.SYSTEM_INTERVAL_MS || 10000);
 const MAX_BODY = 256 * 1024;
+const MAX_AUDIO = 20 * 1024 * 1024;
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 8788);
+const TLS_CERT = process.env.TLS_CERT || '';
+const TLS_KEY = process.env.TLS_KEY || '';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -52,6 +67,12 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
 };
+
+const comms = new Comms({
+  dataDir: DATA_DIR,
+  agentsFile: process.env.AGENTS_FILE,
+  hooks: { getState: () => state, patch: (p) => patchState(p), event: (e) => pushEvent(e) },
+});
 
 // ---------------------------------------------------------------- state
 let state = clone(DEFAULT_STATE);
@@ -81,8 +102,7 @@ function sampleHistory() {
   const now = Date.now();
   const last = history[history.length - 1];
   if (last && now - last.t < HISTORY_INTERVAL_MS) return;
-  const sys = state.system || {}, pw = state.power || {};
-  history.push({ t: now, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null, battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null });
+  history.push(historySample(state, now));
   if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
 }
 
@@ -158,16 +178,16 @@ function send(res, status, body, headers = {}) {
   res.end(data);
 }
 
-function readBody(req) {
+function readBody(req, { max = MAX_BODY, raw = false } = {}) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     req.on('data', (c) => {
       size += c.length;
-      if (size > MAX_BODY) { reject(new Error('body too large')); req.destroy(); return; }
+      if (size > max) { reject(Object.assign(new Error('body too large'), { status: 413 })); req.destroy(); return; }
       chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => { const buf = Buffer.concat(chunks); resolve(raw ? buf : buf.toString('utf8')); });
     req.on('error', reject);
   });
 }
@@ -208,10 +228,16 @@ async function serveStatic(req, res, pathname) {
   try { stat = await fsp.stat(file); } catch { return send(res, 404, 'not found'); }
   if (stat.isDirectory()) return serveStatic(req, res, path.posix.join(rel, 'index.html'));
   const ext = path.extname(file).toLowerCase();
+  // Code is revalidated on every load (cheap 304s), so an update never leaves the iPad running a mix of old
+  // and new modules, which stops the whole page. Images can be cached.
+  const etag = `"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+  const code = ['.html', '.js', '.mjs', '.css', '.json', '.webmanifest'].includes(ext);
+  const headers = { ETag: etag, 'Last-Modified': stat.mtime.toUTCString(), 'Cache-Control': code ? 'no-cache' : 'max-age=86400' };
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
   res.writeHead(200, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Content-Length': stat.size,
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'max-age=300',
+    ...headers,
   });
   if (req.method === 'HEAD') return res.end();
   fs.createReadStream(file).pipe(res);
@@ -255,6 +281,16 @@ async function handle(req, res) {
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, state);
     if (p === '/api/events' && req.method === 'GET') return send(res, 200, state.events || []);
     if (p === '/api/history' && req.method === 'GET') return send(res, 200, history);
+    if (p === '/api/comms/agents' && req.method === 'GET') return send(res, 200, await comms.publicAgents());
+    if (p === '/api/comms/log' && req.method === 'GET') {
+      const who = url.searchParams.get('agent');
+      const since = Number(url.searchParams.get('since') || 0);
+      return send(res, 200, comms.log().filter((e) => (!who || e.from === who || e.to === who) && e.at > since));
+    }
+    if (p.startsWith('/api/comms/audio/') && (req.method === 'GET' || req.method === 'HEAD')) return comms.serveAudio(req, res, p.slice('/api/comms/audio/'.length));
+    if (p === '/api/hermes/overview' && req.method === 'GET') {
+      return send(res, 200, await comms.overview(url.searchParams.get('agent') || 'clawd', { fresh: url.searchParams.has('fresh') }));
+    }
 
     const writing = req.method === 'POST' || req.method === 'PUT';
     if (writing && !authorized(req, url)) return send(res, 401, { error: 'unauthorized' });
@@ -277,6 +313,54 @@ async function handle(req, res) {
       return send(res, 200, { ok: true });
     }
 
+    const baseUrl = `${req.socket.encrypted ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+    const isAudio = /^audio\//.test(req.headers['content-type'] || '');
+
+    if (p === '/api/comms/send' && req.method === 'POST') {
+      const body = parseBody(await readBody(req), req.headers['content-type'] || '');
+      const msg = { ...queryPatch(url), ...(isObj(body) ? body : {}) };
+      if (!String(msg.text || '').trim()) return send(res, 400, { error: 'needs "text"' });
+      return send(res, 200, { ok: true, entry: comms.send({ to: msg.to, kind: msg.kind, text: String(msg.text), baseUrl }) });
+    }
+
+    if (p === '/api/comms/voice' && req.method === 'POST') {
+      if (!isAudio) return send(res, 415, { error: 'send the recording as the body with an audio/* content-type' });
+      const buf = await readBody(req, { max: MAX_AUDIO, raw: true });
+      if (!buf.length) return send(res, 400, { error: 'empty recording' });
+      const to = url.searchParams.get('to');
+      if (!comms.agents()[to]) return send(res, 400, { error: `unknown agent "${to}"` });
+      const audio = await comms.saveAudio(buf, req.headers['content-type']);
+      const entry = comms.send({ to, kind: url.searchParams.get('kind'), text: url.searchParams.get('text') || '', audio, baseUrl });
+      return send(res, 200, { ok: true, entry });
+    }
+
+    if ((p === '/api/comms/stop' || p === '/api/comms/control') && req.method === 'POST') {
+      const body = parseBody(await readBody(req), req.headers['content-type'] || '');
+      if (!isObj(body) || !body.id) return send(res, 400, { error: 'needs the message "id"' });
+      return send(res, 200, p === '/api/comms/stop' ? await comms.stop(String(body.id)) : await comms.control(String(body.id), body));
+    }
+
+    const job = p.match(/^\/api\/hermes\/jobs\/([^/]+)\/(run|pause|resume)$/);
+    if (job && req.method === 'POST') {
+      return send(res, 200, await comms.jobAction(url.searchParams.get('agent') || 'clawd', decodeURIComponent(job[1]), job[2]));
+    }
+
+    if (p === '/api/comms/reply' && req.method === 'POST') {
+      let msg, audio = null;
+      if (isAudio) {
+        msg = queryPatch(url);
+        const buf = await readBody(req, { max: MAX_AUDIO, raw: true });
+        if (buf.length) audio = await comms.saveAudio(buf, req.headers['content-type']);
+      } else {
+        const body = parseBody(await readBody(req), req.headers['content-type'] || '');
+        msg = { ...queryPatch(url), ...(isObj(body) ? body : {}) };
+      }
+      if (!msg.from) return send(res, 400, { error: 'needs "from"' });
+      if (!audio && !msg.audio_url && !String(msg.text ?? '').trim()) return send(res, 400, { error: 'needs "text" or audio' });
+      const entry = await comms.reply({ from: String(msg.from), text: String(msg.text ?? ''), audio, audioUrl: msg.audio_url || null });
+      return send(res, 200, { ok: true, entry });
+    }
+
     if (p === '/api/event' && req.method === 'POST') {
       const body = parseBody(await readBody(req), req.headers['content-type'] || '');
       const ev = { ...queryPatch(url), ...(isObj(body) ? body : {}) };
@@ -287,7 +371,7 @@ async function handle(req, res) {
 
     return send(res, 404, { error: 'not found' });
   } catch (e) {
-    const status = e instanceof SyntaxError ? 400 : 500;
+    const status = e.status || (e instanceof SyntaxError ? 400 : 500);
     return send(res, status, { error: e.message });
   }
 }
@@ -318,22 +402,35 @@ setInterval(() => {
   }
 }, 25000).unref();
 
-const server = http.createServer((req, res) => {
+function onRequest(req, res) {
   handle(req, res).catch((e) => {
     console.error('[room] unhandled', e);
     try { send(res, 500, { error: 'internal error' }); } catch { /* already sent */ }
   });
-});
+}
+const server = http.createServer(onRequest);
 
 server.listen(PORT, HOST, () => {
   console.log(`[room] Clawd's Room is open at http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/`);
   if (TOKEN) console.log('[room] writes require the bearer token');
 });
 
+// HTTPS alongside HTTP when a certificate is given: browsers only allow the microphone on a secure page.
+let secure = null;
+if (TLS_CERT && TLS_KEY) {
+  try {
+    secure = https.createServer({ cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) }, onRequest);
+    secure.listen(HTTPS_PORT, HOST, () => console.log(`[room] HTTPS on port ${HTTPS_PORT} (open /hud/ there to talk to the agents)`));
+  } catch (e) {
+    console.warn(`[room] could not start HTTPS: ${e.message}`);
+  }
+}
+
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     console.log(`\n[room] ${sig}, closing`);
     server.close();
+    if (secure) secure.close();
     for (const res of clients) { try { res.end(); } catch { /* ignore */ } }
     process.exit(0);
   });

@@ -14,6 +14,8 @@ It is one small zero-dependency Node server plus a canvas app. Nothing else to i
 
 ## Quick start
 
+Clawd can install all of it himself: point him at [docs/INSTALL-CLAWD.md](docs/INSTALL-CLAWD.md).
+
 ```bash
 git clone https://github.com/defthrets/clawdsroom /opt/clawdsroom
 cd /opt/clawdsroom
@@ -25,7 +27,8 @@ in the title bar) so you can see everything move. Add `?demo=1` to force it, `?h
 preview the night.
 
 Run it on the homelab itself and `system.*` (CPU, RAM, temperature, `/` and `/mnt` usage,
-uptime) is collected automatically from `/proc`, `/sys` and `df`.
+uptime) and `network.*` (throughput, connections in and out) are collected automatically from
+`/proc`, `/sys` and `df`.
 
 Also included: a `Dockerfile` + `compose.yaml`, and a systemd unit in `deploy/`.
 
@@ -72,6 +75,159 @@ eyes and mouth follow. The room also reads the situation itself: worried when th
 low or the watchdog is unhappy, bored after a long quiet idle, focused at the desk, a flash of
 excitement when you message him, a scowl when the gateway dies. The title bar says what he is
 feeling and a little badge pops over his head when it changes.
+
+## The HUD (the second iPad)
+
+`http://192.168.1.253:8787/hud/` is a sci-fi ops screen for the other iPad mini: no house, no
+cameras, just the numbers, laid out for an iPad mini in landscape.
+
+![Clawd HUD](docs/hud.png)
+
+* **CLAWD**, in the middle: a big holographic core with Clawd himself inside it, his room sprite projected as a
+  flickering, scanlined hologram on a light beam. **Hold him to talk** (or tap to start and again to send), straight
+  from the main screen; TALK or NOTE on the left picks a conversation or a voice note. He blinks and bobs on standby,
+  raises his claws and opens his eyes wide while he listens, turns gold with a loading bar while he works (the tool he
+  is using shows in the corner and orbits him), and talks, with his mouth moving and the words lighting up underneath,
+  when he answers. **⤢ LINK** opens the full neural link with his thinking.
+* **CORE // HOMELAB**: CPU, RAM and temperature rings, `/` and `/mnt`, fan, load, uptime, active
+  subagents, and a 6-hour CPU/RAM trace.
+* **POWER // FOXESS**: battery ring, solar, house load, grid import/export.
+* **UPLINK // STARLINK** (under Clawd): an animated sky with the dish tracking a satellite, packets streaming down
+  (cyan) and up (orange) at a rate that follows the real throughput, handovers, and the
+  obstruction wedge. Down/up, ping and drop rate, plus obstruction, SNR, GPS, azimuth/elevation,
+  dish uptime, firmware and any dish alerts. Below it, throughput and latency charts with ping
+  drops marked. Tap **LIVE / 6H** to switch range, and tap a chart for the exact values at that moment.
+* **NET // CONNECTIONS**: a radar with the homelab in the middle and every peer it is talking to
+  (LAN on the inner ring, WAN on the outer), inbound traffic flowing in and outbound flowing out.
+  Inbound/outbound/listening counts, RX/TX on the WAN interface, the busiest peers (reverse DNS
+  where there is one) with their service, and the ports the box listens on.
+* Along the bottom: cams, Chirpa, crew bus, Telegram, watchdog, ADS-B/433, Immich, memory, next
+  cron, LAN/WAN, and a live event log. Problems (watchdog alerts, Starlink offline or obstructed,
+  low battery, WAN down) show as alerts at the top.
+
+**ROOM** in the HUD's top bar takes you to Clawd's Room, and **HUD ▸** in the room's top bar brings you back.
+
+Add it to the home screen the same way as the room: it has its own manifest, so it opens
+straight to the HUD as **Clawd HUD**. `?demo=1` shows it with simulated data.
+
+The connections panel and RX/TX fill themselves on Linux (from `/proc/net`, every 10s, along with
+`system.*`). In Docker that needs `network_mode: host` (see `compose.yaml`), or the container only sees its own
+connections. The Starlink panel needs `scripts/examples/starlink.sh`. It reads the dish's gRPC
+status with [grpcurl](https://github.com/fullstorydev/grpcurl) and pushes `starlink.*`:
+
+```bash
+scripts/examples/starlink.sh --loop 5     # every 5s, forever (or cron it once a minute)
+```
+
+### Talking to Clawd from the HUD
+
+Clawd runs on [Hermes Agent](https://hermes-agent.nousresearch.com/), and the HUD talks to him through Hermes
+Agent's API server. Tap **COMMS** in the HUD's top bar and the **neural link** takes over the screen. In the middle is
+a holographic core: it breathes on standby, ripples with your voice while it listens, swirls amber while Clawd
+thinks (with the tool he is using underneath), and pulses as he answers while his words light up karaoke-style. Then either:
+
+![Comms](docs/hud-comms.png)
+
+* **TALK**: hold the core and speak (or tap it once to start and again to send). Clawd's reply
+  appears in the thread and is **read out loud** on the iPad, and the console opens itself when it
+  arrives. While he works, the tool he is using shows under your message (`⚙ terminal: ...`). His reply
+  also comes out of his mouth in the room.
+* **VOICE NOTE**: the same core leaves a recorded message. The audio is kept and Clawd gets it as a
+  voice message with the transcript and a link to the recording.
+* Or type into the box under the comm log.
+
+**Clawd's thinking, live.** Next to the core, the **COGNITION** panel shows each turn as it happens: a timeline of
+steps (packet received, transcribed, uplink to Hermes Agent, each tool he calls, reasoning, composing, response) with
+a running timer on the live one, and a **THOUGHT STREAM** where his reasoning types itself out. Each tool launches out
+of the core as a labelled node and orbits while he works. Once he starts writing, the core turns gold (COMPOSING)
+and the answer forms in the caption before it is spoken. Afterwards, tap **▸ TRACE** under any message in the comm log
+to see that turn's steps, timings and reasoning again.
+
+**His terminal, on the wall.** When Hermes Agent offers its Runs API (the HUD checks `/v1/capabilities`), turns go through
+it instead of plain chat, and the HUD gets what his terminal shows:
+
+* every tool call with the command it ran (`docker system df`), what came back, how long it took, and a red ✕ if it failed
+* sub-agents he delegates to, with their status, time and cost
+* **AUTHORIZATION REQUIRED**: when Clawd wants to run something Hermes flags as dangerous, the whole HUD turns into a
+  red hazard alert with the exact command, and says so out loud. **APPROVE ONCE** or **DENY** right there; he stays
+  paused until you decide
+* **CLARIFICATION REQUESTED**: when he needs to ask you something, the question comes up in amber with its options and
+  an answer box
+* **■ ABORT** on the neural link stops a turn that is running, on Hermes too
+
+![Authorization](docs/hud-auth.png)
+
+**HERMES // SYSTEMS.** The **HERMES** button in the top bar opens everything around Clawd on Hermes Agent: core status
+and readiness checks, his model and providers, capability flags, a hex matrix of his **skills**, his **toolsets** (which are
+on, which tools each has), his **scheduled jobs** with next run and last result plus ▶ run now and ❚❚ pause / ↻ resume,
+and his recent **sessions** across Telegram, Discord, cron and the HUD. It resyncs every 20 seconds.
+
+![Hermes systems](docs/hud-hermes.png)
+
+In demo mode (`/hud/?demo=1`) all of it is simulated; ask the neural link to "clear the docker cache" to see an
+authorization. Set `"api": "chat"` on the `clawd` entry to force plain chat completions, or `"api": "runs"` to force runs.
+
+The live trace comes from Hermes Agent's stream: tool steps from its `hermes.tool.progress` events (on by default,
+`gateway.platforms.api_server.tool_progress_events`), reasoning from `reasoning_content` when the model streams it
+(some models and providers don't, and the panel says so), and the answer as it is written.
+
+Every message and reply stays in the comm log (new replies decrypt into place), with a ▶ to play the audio back. The console closes on its
+own after 90 seconds of quiet.
+
+Setting it up:
+
+1. **Serve the HUD over HTTPS.** iPad Safari only lets a page use the microphone over HTTPS. Give
+   the server a certificate and it serves HTTPS on a second port (`HTTPS_PORT`, default 8788)
+   next to plain HTTP:
+
+   ```bash
+   # with Tailscale (the iPad on the tailnet; a real certificate, nothing to install on the iPad)
+   tailscale cert homelab.your-tailnet.ts.net
+   TLS_CERT=$PWD/homelab.your-tailnet.ts.net.crt TLS_KEY=$PWD/homelab.your-tailnet.ts.net.key npm start
+   # then on the iPad: https://homelab.your-tailnet.ts.net:8788/hud/
+   ```
+
+   Or use [mkcert](https://github.com/FiloSottile/mkcert) (`mkcert 192.168.1.253`), AirDrop `rootCA.pem` to the
+   iPad, install it, and turn it on under Settings → General → About → Certificate Trust Settings.
+   Then open `https://192.168.1.253:8788/hud/` and add *that* to the home screen. Without HTTPS the
+   console still works for typing and spoken replies, just not the mic.
+
+2. **Point it at Hermes Agent.** Turn on Hermes Agent's API server in `~/.hermes/.env`:
+
+   ```bash
+   API_SERVER_ENABLED=true
+   API_SERVER_KEY=<a long random key>
+   # API_SERVER_HOST=0.0.0.0   only if the room runs on another machine or in Docker (default 127.0.0.1)
+   ```
+
+   Restart `hermes gateway` (it should log `API server listening on http://127.0.0.1:8642`). Then copy
+   `scripts/examples/agents.example.json` to `data/agents.json` (it is re-read live, no restart needed) and start the
+   room with `HERMES_API_SERVER_KEY` set to the same key. `"key": "$NAME"` reads keys from the environment, so secrets
+   stay out of the file.
+
+   Each message goes to Hermes Agent's `/v1/chat/completions` with `X-Hermes-Session-Id: clawd-hud`. Hermes keeps
+   the conversation and Clawd's memory itself, so the HUD only sends what you just said. The reply streams back,
+   along with the tool progress. Options on the `clawd` entry: `url` (default `http://127.0.0.1:8642`), `profile` (a
+   multiplexed Hermes profile, sent as `/p/<profile>/...`), `session` (default `clawd-hud`), `system` (an extra
+   system prompt), `timeout_s` (how long Hermes may go silent, default 300). The COMMS card shows **OFFLINE** when
+   Hermes' `/health` doesn't answer.
+
+   Hermes Agent's API takes text, not audio, so voice needs a transcript (step 3). Other link types, for anything
+   else you want on the console as its own entry: `openai` (any other chat-completions endpoint; `history: 10`
+   sends the last ten exchanges), `webhook` (gets `{id, to, kind, text, message, audio_url, reply_url}`; a
+   `{"reply": "..."}` in the response counts) and `command` (a shell command with `COMMS_TEXT`, `COMMS_AUDIO`,
+   `COMMS_AUDIO_URL`... in its environment; its stdout is the reply). An entry with no link still gets its messages
+   in the thread, marked queued. It can read them with `room inbox <name>` and answer with `room reply <name> "..."`.
+
+3. **Speech-to-text and voices.** Safari can transcribe as you speak (it needs Siri & Dictation on, and
+   doesn't always manage it from a home-screen app). When it does, that text goes with the recording. For transcripts you can count on, point `STT_URL` at any OpenAI-style
+   `/v1/audio/transcriptions` endpoint (a local [Speaches](https://github.com/speaches-ai/speaches)/faster-whisper server, or
+   OpenAI with `STT_KEY`), and it will transcribe whatever Safari didn't. If Hermes' own voice mode already runs a faster-whisper setup,
+   a Speaches server is the same engine behind an HTTP API. Replies are spoken with the iPad's own voices
+   (set `"voice"` per agent to pick one, e.g. `Daniel`), or set `TTS_URL` (an OpenAI-style `/v1/audio/speech`) and
+   `"tts_voice"` per agent for server-made audio.
+
+If `CLAWDSROOM_TOKEN` is set, open the HUD once with `?token=...` and it remembers it.
 
 ## Wiring it to the homelab
 
@@ -120,6 +276,7 @@ curl -X POST 'http://192.168.1.253:8787/api/event?type=plane&callsign=BAW123&alt
 | **RTL-SDR** | `room state sdr.planes=3 sdr.sensors=5` from the dump1090 / rtl_433 side; `room event plane callsign=.. alt=..` for a flyover. |
 | **Cron** | `room event cron "name=morning brief"` as the first line of each job (see `scripts/examples/crontab.example`). The schedule itself lives in `cron[]` in the state. |
 | **Crew presence** | `room state crew.hermes.online=true`. |
+| **Starlink** | `scripts/examples/starlink.sh --loop 5` (needs `grpcurl` + `jq`, and a route to the dish at `192.168.100.1`). Also sets `network.wan` and `network.latency_ms`. |
 | **Weather** | `room state weather.condition=rain weather.sunrise=06:40 weather.sunset=18:20` (optional; drives the sky). |
 
 Everything is optional. Whatever is not wired stays at its default and the room still looks fine.
@@ -164,6 +321,13 @@ Environment variables for the server:
 | `DATA_DIR` | `./data` | Where `state.json` is persisted. |
 | `COLLECT_SYSTEM` | `1` on Linux | Auto-fill `system.*` every `SYSTEM_INTERVAL_MS` (10000). |
 | `DISK_ROOT`, `DISK_MNT` | `/`, `/mnt` | Paths reported as `disk_root` / `disk_mnt`. |
+| `NET_IFACE` | default route | Interface the HUD reports RX/TX for. |
+| `TLS_CERT`, `TLS_KEY`, `HTTPS_PORT` | unset, unset, `8788` | Also serve HTTPS (the HUD's mic needs it). |
+| `AGENTS_FILE` | `data/agents.json` | How to reach Clawd (Hermes Agent) and anything else on the comms (see above). |
+| `HERMES_API_SERVER_KEY` | unset | Hermes Agent's `API_SERVER_KEY`, read by the example `agents.json`. |
+| `PUBLIC_URL` | the request's host | Base URL for the audio links handed to agents. |
+| `STT_URL`, `STT_KEY`, `STT_MODEL`, `STT_LANGUAGE` | unset, `whisper-1` | Server-side transcription of voice messages. |
+| `TTS_URL`, `TTS_KEY`, `TTS_MODEL`, `TTS_VOICE` | unset, `tts-1`, `alloy` | Server-side voices for replies. |
 
 Display settings live in the state (`settings.*`): `sleep_after_min` (20), `reload_hours` (24),
 `theme_hour_offset` (shift the day/night cycle for testing).
@@ -171,7 +335,9 @@ Display settings live in the state (`settings.*`): `sleep_after_min` (20), `relo
 ## Layout
 
 ```
-server/server.js     HTTP + SSE + persistence + Linux system collector (no dependencies)
+server/server.js     HTTP + SSE + persistence (no dependencies)
+server/system.js     Linux system collector; server/network.js: throughput + TCP connections
+server/comms.js      the HUD's voice link to the agents
 public/js/defaults.js  the state contract (shared by server and browser)
 public/js/reducer.js   deep-merge + what each event does to the state (shared)
 public/js/scene.js     the house: layout, furniture, sky, lighting, tap targets
@@ -179,7 +345,8 @@ public/js/actors.js    Clawd, the dog, the bird, the bots, the bus
 public/js/effects.js   particles, labels, smoke, rain
 public/js/hud.js       stat tiles, ticker, toasts, info card
 public/js/demo.js      the simulation used when nothing is wired up
-scripts/room           CLI; scripts/examples/ collectors
+public/hud/             the ops HUD (/hud/): homelab, Starlink, connections, comms
+scripts/room           CLI; scripts/examples/ collectors (frigate, immich, starlink)
 ```
 
 The scene is drawn on a 480×360 pixel canvas scaled to the screen with nearest-neighbour

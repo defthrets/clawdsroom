@@ -75,6 +75,12 @@ canvas#scene {
   font-size: 0.95em;
 }
 .topbar .clock { font-weight: 700; letter-spacing: 0.08em; font-size: 1.25em; white-space: nowrap; }
+.topbar .right { display: flex; align-items: center; gap: calc(var(--u, 2px) * 3); }
+.topbar .to-hud {
+  pointer-events: auto; text-decoration: none; font-weight: 700; letter-spacing: 0.14em; font-size: 0.95em;
+  color: #22e5ff; border: 1px solid rgba(34, 229, 255, 0.7); background: rgba(8, 10, 24, 0.82); box-shadow: 0 0 8px rgba(34, 229, 255, 0.35);
+  padding: calc(var(--u, 2px) * 0.8) calc(var(--u, 2px) * 2.2); text-shadow: 0 0 6px rgba(34, 229, 255, 0.6);
+}
 .dot {
   width: calc(var(--u, 2px) * 3);
   height: calc(var(--u, 2px) * 3);

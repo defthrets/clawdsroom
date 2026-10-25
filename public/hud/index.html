@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Clawd HUD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clawd HUD">
+  <meta name="theme-color" content="#02050b">
+  <meta name="description" content="Clawd's ops HUD: the homelab, the Starlink dish and every connection in and out, live.">
+  <link rel="manifest" href="/hud/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/hud/hud.css">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div id="stage" class="stage">
+    <header class="top">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 9 23 13v6l-7 4-7-4v-6Z" fill="currentColor" opacity=".35"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/></svg>
+        <div>
+          <div class="brand-name">CLAWD<span>//</span>OPS</div>
+          <div class="brand-sub"><span id="host">192.168.1.253</span> · <span id="mode" class="mode">LINK…</span></div>
+        </div>
+      </div>
+      <div class="now">
+        <div class="now-k">OPERATOR</div>
+        <div class="now-v" id="now">Clawd is settling in…</div>
+      </div>
+      <div class="alerts" id="alerts"></div>
+      <div class="top-btns">
+        <a class="comms-btn room-btn" id="room-btn" href="/" aria-label="go to Clawd's Room"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>ROOM</a>
+        <button class="comms-btn sys-btn" id="sys-btn" aria-label="Hermes systems"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2"/></svg>HERMES</button>
+      <button class="comms-btn" id="comms-btn" aria-label="talk to the agents"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>COMMS<span class="badge hidden" id="comms-badge"></span></button>
+      </div>
+      <div class="clock">
+        <div class="clock-t" id="clock">--:--<span id="secs">:--</span></div>
+        <div class="clock-d" id="date">---</div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- left: the homelab itself + power -->
+      <section class="panel core">
+        <h2><i></i>CORE <b>// HOMELAB</b><em id="uptime">UP —</em></h2>
+        <div class="rings">
+          <div class="ring" id="r-cpu"></div>
+          <div class="ring" id="r-ram"></div>
+          <div class="ring" id="r-temp"></div>
+        </div>
+        <div class="bars">
+          <div class="bar" id="b-root"><span class="bk">DISK /</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+          <div class="bar" id="b-mnt"><span class="bk">DISK /MNT</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+          <div class="bar" id="b-fan"><span class="bk">FAN</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+        </div>
+        <div class="kv3">
+          <div><span>LOAD</span><b id="load">—</b></div>
+          <div><span>/MNT</span><b id="mnt-gb">—</b></div>
+          <div><span>SUBAGENTS</span><b id="agents">0</b></div>
+        </div>
+        <div class="chart-head"><span>CPU · RAM <em>6H</em></span><span class="legend"><i class="sw c-cpu"></i>CPU <i class="sw c-ram"></i>RAM</span></div>
+        <canvas id="c-core" class="chart"></canvas>
+      </section>
+
+      <section class="panel power">
+        <h2><i></i>POWER <b>// FOXESS</b><em id="pw-state">—</em></h2>
+        <div class="power-row">
+          <div class="ring big" id="r-bat"></div>
+          <div class="flows">
+            <div class="flow"><span>SOLAR</span><b id="pw-solar">—</b></div>
+            <div class="flow"><span>LOAD</span><b id="pw-load">—</b></div>
+            <div class="flow"><span>GRID</span><b id="pw-grid">—</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- centre: Clawd himself, hold to talk; the dish underneath -->
+      <div class="center">
+        <section class="panel clawd-panel" id="clawd-panel" data-state="idle">
+          <h2><i></i>CLAWD <b>// NEURAL LINK</b><em id="hud-link">—</em><button class="hud-expand" id="hud-expand" aria-label="open the full neural link">⤢ LINK</button></h2>
+          <div class="hud-core-wrap">
+            <canvas id="hud-core" aria-label="hold to talk to Clawd"></canvas>
+            <div class="hud-step" id="hud-step"></div>
+            <div class="hud-mode">
+              <button class="sel" data-mode="talk">TALK</button>
+              <button data-mode="note">NOTE</button>
+            </div>
+            <div class="hud-tip" id="hud-tip">HOLD TO TALK</div>
+          </div>
+          <div class="hud-state" id="hud-state">STANDBY</div>
+          <div class="hud-caption" id="hud-caption"></div>
+        </section>
+
+        <section class="panel uplink compact">
+          <h2><i></i>UPLINK <b>// STARLINK</b><em id="sl-state">—</em></h2>
+          <div class="sky-wrap">
+            <canvas id="c-sky"></canvas>
+            <div class="sky-hud tl"><span>DOWN</span><b id="sl-down">—</b></div>
+            <div class="sky-hud tr"><span>UP</span><b id="sl-up">—</b></div>
+            <div class="sky-hud bl"><span>PING</span><b id="sl-ping">—</b></div>
+            <div class="sky-hud br"><span>DROP</span><b id="sl-drop">—</b></div>
+            <div class="sky-off hidden" id="sl-off">NO SIGNAL</div>
+          </div>
+          <div class="chips" id="sl-chips"></div>
+          <div class="charts2">
+            <div class="ch">
+              <div class="chart-head"><span>THROUGHPUT <em id="tp-unit">Mb/s</em></span><span class="legend"><i class="sw c-down"></i>DN <i class="sw c-up"></i>UP<button class="range" id="range">LIVE</button></span></div>
+              <canvas id="c-tp" class="chart"></canvas>
+            </div>
+            <div class="ch">
+              <div class="chart-head"><span>LATENCY <em>ms</em></span><span class="legend"><i class="sw c-ms"></i>PING <i class="sw c-drop"></i>DROP</span></div>
+              <canvas id="c-ms" class="chart"></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- right: who we're talking to -->
+      <section class="panel net">
+        <h2><i></i>NET <b>// CONNECTIONS</b><em id="iface">—</em></h2>
+        <div class="radar-wrap">
+          <canvas id="c-radar"></canvas>
+        </div>
+        <div class="counters">
+          <div class="cnt in"><span>▼ IN</span><b id="n-in">0</b></div>
+          <div class="cnt out"><span>▲ OUT</span><b id="n-out">0</b></div>
+          <div class="cnt"><span>LISTEN</span><b id="n-listen">0</b></div>
+          <div class="cnt"><span>RX</span><b id="n-rx">—</b></div>
+          <div class="cnt"><span>TX</span><b id="n-tx">—</b></div>
+        </div>
+        <div class="peers-head"><span>DIR</span><span>PEER</span><span>SERVICE</span><span>N</span></div>
+        <div class="peers" id="peers"></div>
+        <div class="ports" id="ports"></div>
+      </section>
+    </main>
+
+    <footer class="bottom">
+      <div class="tiles" id="tiles"></div>
+      <div class="panel log">
+        <h2><i></i>EVENT <b>// LOG</b></h2>
+        <div class="log-lines" id="log"></div>
+      </div>
+    </footer>
+
+    <!-- comms: the neural link to the agents -->
+    <section class="comms hidden" id="comms" role="dialog" aria-label="Comms">
+      <div class="nl-frame"></div>
+      <header class="nl-top">
+        <div class="nl-title"><span class="nl-glyph">◢</span>NEURAL LINK <b>//</b> <span id="cm-title">CLAWD</span></div>
+        <div class="nl-chips" id="cm-chips"></div>
+        <button class="nl-close" id="cm-close" aria-label="close"><span>✕</span></button>
+      </header>
+      <div class="nl-body">
+        <div class="nl-stage">
+          <div class="nl-cog">
+            <div class="nl-agents" id="cm-agents"></div>
+            <div class="cog" id="cg">
+              <div class="cog-head"><span><i></i>COGNITION</span><em id="cg-live">IDLE</em></div>
+              <div class="cog-meta"><span>STEPS <b id="cg-steps">0</b></span><span>T+ <b id="cg-time">0.0s</b></span><span>TOOLS <b id="cg-tools">0</b></span></div>
+              <ol class="cog-steps" id="cg-list"></ol>
+              <div class="cog-k"><span>THOUGHT STREAM</span><em id="cg-chars"></em></div>
+              <div class="cog-thought" id="cg-thought"></div>
+            </div>
+          </div>
+          <div class="nl-center">
+            <div class="nl-read tl"><span>SIGNAL</span><b id="cm-sig">—</b></div>
+            <div class="nl-read tr"><span>AMPLITUDE</span><b id="cm-amp">—</b></div>
+            <div class="nl-read bl"><span>CHANNEL</span><b id="cm-chan">—</b></div>
+            <div class="nl-read br"><span>T+</span><b id="cm-clock">00:00</b></div>
+            <canvas id="cm-core" class="nl-core" aria-label="hold to talk"></canvas>
+            <div class="nl-state" id="cm-state">STANDBY</div>
+            <div class="nl-caption" id="cm-caption"></div>
+            <div class="nl-controls">
+              <button class="nl-side" id="cm-cancel" disabled>✕ DISCARD</button>
+              <div class="nl-mode" role="radiogroup">
+                <button class="sel" data-mode="talk"><i></i>TALK</button>
+                <button data-mode="note"><i></i>VOICE NOTE</button>
+              </div>
+              <button class="nl-side sel" id="cm-speak">VOICE ON</button>
+            </div>
+            <div class="nl-hint" id="cm-hint"></div>
+          </div>
+        </div>
+        <aside class="nl-log">
+          <div class="nl-k"><span>COMM LOG</span><em id="cm-count">0</em></div>
+          <div class="nl-thread" id="cm-thread"></div>
+          <div class="nl-input">
+            <span class="nl-prompt">&gt;</span>
+            <input id="cm-input" type="text" placeholder="transmit text…" autocomplete="off" enterkeyhint="send">
+            <button id="cm-send">SEND</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Hermes Agent: the system around Clawd -->
+    <section class="comms sys hidden" id="sys" role="dialog" aria-label="Hermes systems">
+      <div class="nl-frame"></div>
+      <header class="nl-top">
+        <div class="nl-title"><span class="nl-glyph">⬢</span>HERMES <b>//</b> SYSTEMS</div>
+        <div class="nl-chips"><span class="nl-chip" id="sys-at">SYNC —</span><span class="nl-chip bad-t" id="sys-err"></span></div>
+        <button class="nl-side sys-refresh" id="sys-refresh">⟳ RESYNC</button>
+        <button class="nl-close" id="sys-close" aria-label="close"><span>✕</span></button>
+      </header>
+      <div class="sys-body">
+        <div class="sys-col">
+          <div class="sys-card sys-core">
+            <div class="sys-k">AGENT CORE</div>
+            <div class="sys-orb" id="sys-status"><i></i><i></i><i></i><b id="sys-status-t">—</b></div>
+            <dl class="sys-dl">
+              <div><dt>PLATFORM</dt><dd id="sys-platform">—</dd></div>
+              <div><dt>MODEL</dt><dd id="sys-model">—</dd></div>
+              <div><dt>ACTIVE RUNS</dt><dd id="sys-runs">0</dd></div>
+            </dl>
+          </div>
+          <div class="sys-card grow">
+            <div class="sys-k">READINESS</div>
+            <ul class="sys-checks" id="sys-checks"></ul>
+            <div class="sys-k">CAPABILITIES</div>
+            <div class="sys-caps" id="sys-caps"></div>
+            <div class="sys-k">PROVIDERS</div>
+            <div class="sys-caps" id="sys-providers"></div>
+          </div>
+        </div>
+        <div class="sys-col">
+          <div class="sys-card grow">
+            <div class="sys-k">SKILL MATRIX <em id="sys-skill-n">0</em></div>
+            <div class="hexes" id="sys-skills"></div>
+          </div>
+          <div class="sys-card">
+            <div class="sys-k">TOOLSETS <em id="sys-tool-n">0</em></div>
+            <div class="toolsets" id="sys-toolsets"></div>
+          </div>
+        </div>
+        <div class="sys-col">
+          <div class="sys-card">
+            <div class="sys-k">SCHEDULE · CRON <em id="sys-job-n">0</em></div>
+            <div class="jobs" id="sys-jobs"></div>
+          </div>
+          <div class="sys-card grow">
+            <div class="sys-k">SESSIONS</div>
+            <div class="sessions" id="sys-sessions"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hermes is waiting on you: approve a command, or answer a question -->
+    <div class="auth hidden" id="auth" role="alertdialog" aria-label="Authorization required">
+      <div class="auth-box">
+        <div class="auth-hazard"></div>
+        <div class="auth-k" id="auth-k">⚠ AUTHORIZATION REQUIRED</div>
+        <div class="auth-who" id="auth-who">CLAWD · HERMES AGENT</div>
+        <div class="auth-title" id="auth-title"></div>
+        <pre class="auth-cmd" id="auth-cmd"></pre>
+        <div class="auth-choices" id="auth-choices"></div>
+        <div class="auth-answer hidden" id="auth-answer"><span>&gt;</span><input id="auth-input" type="text" placeholder="your answer…" autocomplete="off" enterkeyhint="send"><button id="auth-send">ANSWER</button></div>
+        <div class="auth-foot" id="auth-foot"></div>
+      </div>
+    </div>
+
+    <div class="scan" aria-hidden="true"></div>
+
+    <div class="boot" aria-hidden="true">
+      <div class="boot-in">
+        <div class="boot-logo"><svg viewBox="0 0 32 32"><path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 9 23 13v6l-7 4-7-4v-6Z" fill="currentColor" opacity=".35"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/></svg>CLAWD<span>//</span>OPS</div>
+        <div class="boot-line">INITIALISING HOMELAB CORE ........................ <b>OK</b></div>
+        <div class="boot-line">FOXESS POWER BUS ................................. <b>OK</b></div>
+        <div class="boot-line">STARLINK UPLINK .................................. <b>OK</b></div>
+        <div class="boot-line">NET RADAR · PEER TRACKING ........................ <b>OK</b></div>
+        <div class="boot-line">NEURAL LINK · HERMES AGENT ....................... <b>OK</b></div>
+        <div class="boot-bar"><i></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="diag hidden" id="diag" role="alert"></div>
+  <script>
+    // Shows on the wall what went wrong if the HUD can't start (old Safari, a missing file, a script error).
+    (function () {
+      var box = document.getElementById('diag'), lines = [];
+      function show(msg) {
+        if (lines.indexOf(msg) < 0) lines.push(msg);
+        box.innerHTML = '<b>HUD DIAGNOSTIC</b><br>' + lines.slice(-6).map(function (l) { return String(l).replace(/[<>&]/g, ''); }).join('<br>') +
+          '<br><small>' + navigator.userAgent.replace(/[<>&]/g, '') + '</small><br><small>tap to hide</small>';
+        box.className = 'diag';
+      }
+      window.hudError = show;
+      box.addEventListener('click', function () { box.className = 'diag hidden'; });
+      window.addEventListener('error', function (e) {
+        if (e && e.target && e.target !== window && (e.target.src || e.target.href)) { show('could not load ' + (e.target.src || e.target.href)); return; }
+        show((e.message || 'script error') + (e.filename ? ' @ ' + e.filename.replace(location.origin, '') + ':' + e.lineno : ''));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) { show('unhandled: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+      setTimeout(function () {
+        if (!(window.hud && window.hud.ok)) show('the HUD script did not start after 8s. If this Safari is older than iOS 14, update iPadOS; otherwise send this box to Claude.');
+      }, 8000);
+    })();
+  </script>
+  <script nomodule>document.getElementById('diag').className = 'diag'; document.getElementById('diag').innerHTML = '<b>HUD DIAGNOSTIC</b><br>This browser does not support JavaScript modules. Update iPadOS (Settings, General, Software Update).';</script>
+  <script type="module" src="/hud/hud.js"></script>
+</body>
+</html>
