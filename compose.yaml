@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     ports:
       - "8787:8787"
+    # The HUD's connections panel reads /proc/net, which is per network namespace. To see the
+    # homelab's real connections, use the host network instead of the port mapping above:
+    # network_mode: host
     environment:
       - COLLECT_SYSTEM=1
       - DISK_ROOT=/host/root

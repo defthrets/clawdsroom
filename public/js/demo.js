@@ -14,6 +14,33 @@ const BUS_LINES = ['anyone seen the shed cam?', 'pushing a fix now', 'brew?', 'p
 const CAM_LABELS = ['person', 'cat', 'car', 'dog', 'bird'];
 const CALLSIGNS = ['BAW123', 'RYR9UK', 'EZY45T', 'SHT2A', 'DLH4PR', 'UAE12', 'TOM7HE', 'VIR20'];
 const AGENTS = ['researcher', 'fixer', 'summariser', 'scout'];
+// Who the homelab might be talking to (for the HUD's connections panel).
+const PEERS = [
+  { ip: '192.168.1.40', port: 8787, dir: 'in', svc: 'clawd', scope: 'lan' },
+  { ip: '192.168.1.41', port: 8787, dir: 'in', svc: 'clawd', scope: 'lan' },
+  { ip: '192.168.1.22', port: 22, dir: 'in', svc: 'ssh', scope: 'lan' },
+  { ip: '192.168.1.60', port: 5000, dir: 'in', svc: 'frigate', scope: 'lan' },
+  { ip: '192.168.1.71', port: 554, dir: 'out', svc: 'rtsp', scope: 'lan' },
+  { ip: '192.168.1.72', port: 554, dir: 'out', svc: 'rtsp', scope: 'lan' },
+  { ip: '192.168.1.73', port: 554, dir: 'out', svc: 'rtsp', scope: 'lan' },
+  { ip: '100.101.7.12', port: 2283, dir: 'in', svc: 'immich', scope: 'lan' },
+  { ip: '149.154.167.220', port: 443, dir: 'out', svc: 'https', scope: 'wan', host: 'api.telegram.org' },
+  { ip: '160.79.104.10', port: 443, dir: 'out', svc: 'https', scope: 'wan', host: 'api.anthropic.com' },
+  { ip: '140.82.113.5', port: 443, dir: 'out', svc: 'https', scope: 'wan', host: 'lb-140-82-113-5-iad.github.com' },
+  { ip: '104.16.11.34', port: 443, dir: 'out', svc: 'https', scope: 'wan', host: 'cloudflare' },
+  { ip: '52.28.4.190', port: 443, dir: 'out', svc: 'https', scope: 'wan', host: 'foxesscloud.com' },
+  { ip: '185.125.190.58', port: 123, dir: 'out', svc: 'ntp', scope: 'wan', host: 'ntp.ubuntu.com' },
+  { ip: '81.2.69.160', port: 22, dir: 'in', svc: 'ssh', scope: 'wan' },
+];
+const PORTS = [22, 53, 80, 443, 554, 1883, 2283, 5000, 8123, 8787, 9090].map((port) => ({ port, svc: { 22: 'ssh', 53: 'dns', 80: 'http', 443: 'https', 554: 'rtsp', 1883: 'mqtt', 2283: 'immich', 5000: 'frigate', 8123: 'home-asst', 8787: 'clawd', 9090: 'prom' }[port] }));
+
+function demoPeers() {
+  const list = PEERS.filter(() => chance(0.78)).map((p) => ({ ...p, n: p.svc === 'https' ? randInt(1, 9) : randInt(1, 3) }));
+  list.sort((a, b) => b.n - a.n);
+  const conns_in = list.filter((p) => p.dir === 'in').reduce((a, p) => a + p.n, 0);
+  const conns_out = list.filter((p) => p.dir === 'out').reduce((a, p) => a + p.n, 0) + randInt(4, 20);
+  return { peers: list, conns_in, conns_out };
+}
 
 function hourNow() { const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
 
@@ -38,7 +65,8 @@ export function startDemo(store) {
     immich: { photos: 12840, last_upload: Date.now() - 3600e3 * 2 },
     sdr: { planes: 2, sensors: 5 },
     subagents: { active: 0, names: [] },
-    network: { wan: true, latency_ms: 11, devices: 34 },
+    network: { wan: true, latency_ms: 31, devices: 34, iface: 'eth0', rx_bps: 18e6, tx_bps: 2.4e6, rx_total: 4.1e11, tx_total: 6.2e10, listening: PORTS.length, ports: PORTS, ...demoPeers() },
+    starlink: { online: true, state: 'OKAY', latency_ms: 31, drop_rate: 0.002, down_bps: 18e6, up_bps: 2.4e6, obstructed: false, fraction_obstructed: 0.0042, snr_ok: true, gps_sats: 14, azimuth: 12.4, elevation: 64.8, uptime: 86400 * 6 + 3600 * 3, software: '2026.10.14.mr48121', hardware: 'rev4_prod2', eth_mbps: 1000, alerts: [], updated: Date.now() },
     crew: { hermes: { online: true }, wormer: { online: true }, opus: { online: false }, jenkins: { online: true }, vinny: { online: false } },
   });
 
@@ -51,7 +79,9 @@ export function startDemo(store) {
       const hour = new Date(t).getHours() + new Date(t).getMinutes() / 60;
       const sun = Math.max(0, Math.sin(Math.PI * (hour - 6.5) / 12));
       const cpu = clamp(20 + 15 * Math.sin(i / 9) + rand(-6, 6), 3, 95);
-      h.push({ t, cpu: Math.round(cpu), ram: Math.round(44 + 4 * Math.sin(i / 40)), temp: Math.round(40 + cpu * 0.3), disk_root: 61, disk_mnt: 67, battery: Math.round(clamp(76 - i * 0.03 + sun * 10, 8, 100)), solar_w: Math.round(sun * 2600 + rand(-80, 80)), load_w: Math.round(320 + cpu * 4) });
+      const down = Math.round((12 + 25 * Math.abs(Math.sin(i / 13)) + rand(0, 15)) * 1e6), up = Math.round(down * rand(0.08, 0.2));
+      const ms = Math.round(26 + 8 * Math.sin(i / 7) + rand(0, 10));
+      h.push({ t, cpu: Math.round(cpu), ram: Math.round(44 + 4 * Math.sin(i / 40)), temp: Math.round(40 + cpu * 0.3), disk_root: 61, disk_mnt: 67, battery: Math.round(clamp(76 - i * 0.03 + sun * 10, 8, 100)), solar_w: Math.round(sun * 2600 + rand(-80, 80)), load_w: Math.round(320 + cpu * 4), rx_bps: down, tx_bps: up, conns_in: randInt(4, 12), conns_out: randInt(20, 50), sl_down: down, sl_up: up, sl_ms: ms, sl_drop: chance(0.05) ? rand(0.01, 0.08) : 0 });
     }
     store.setHistory(h);
   }
@@ -69,6 +99,13 @@ export function startDemo(store) {
     battery += (solar - load) / 60000 * 2; // slow
     battery = clamp(battery, 8, 100);
     const cpu = clamp(s.system.cpu + rand(-8, 8) + (s.clawd.activity === 'terminal' ? 3 : -1), 3, 97);
+    // Starlink: bursty downlink, a slow wobble on the ping, the odd dropout as a satellite hands over.
+    const burst = chance(0.15) ? rand(40, 160) : rand(4, 40);
+    const down = Math.round(clamp(Number(s.starlink.down_bps || 0) * 0.55 + burst * 1e6 * 0.45, 0.5e6, 220e6));
+    const up = Math.round(down * rand(0.06, 0.22));
+    const handover = chance(0.06);
+    const ms = clamp(Number(s.starlink.latency_ms || 30) * 0.7 + rand(22, 42) * 0.3 + (handover ? rand(20, 60) : 0), 18, 140);
+    const drop = handover ? Number(rand(0.02, 0.12).toFixed(3)) : 0;
     store.patch({
       system: {
         cpu: Math.round(cpu),
@@ -78,7 +115,8 @@ export function startDemo(store) {
         uptime: s.system.uptime + 2,
       },
       power: { battery: Math.round(battery), solar_w: solar, load_w: load, grid_w: Math.max(0, load - solar - (battery > 10 ? 500 : 0)), charging: solar > load },
-      network: { latency_ms: randInt(8, 24) },
+      network: { latency_ms: Math.round(ms), rx_bps: down, tx_bps: up, ...(chance(0.25) ? demoPeers() : {}) },
+      starlink: { latency_ms: Math.round(ms * 10) / 10, down_bps: down, up_bps: up, drop_rate: drop, obstructed: drop > 0.05, uptime: (s.starlink.uptime || 0) + 2, updated: Date.now() },
       sdr: { planes: chance(0.1) ? randInt(0, 5) : s.sdr.planes },
     });
     if (day === 0 && h > 1 && h < 5 && chance(0.02)) store.patch({ power: { battery: 12 } });

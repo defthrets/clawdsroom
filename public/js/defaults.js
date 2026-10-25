@@ -130,10 +130,42 @@ export const DEFAULT_STATE = {
     names: [],
   },
 
-  network: {                   // the road out the back
+  network: {                   // the road out the back; the HUD's connections panel
     wan: true,
     latency_ms: 0,
     devices: 0,
+    // Auto-filled on Linux from /proc/net (see server/network.js):
+    iface: '',                 // interface carrying the default route
+    rx_bps: 0,                 // bits/s in on that interface
+    tx_bps: 0,                 // bits/s out
+    rx_total: 0,               // bytes since boot
+    tx_total: 0,
+    conns_in: 0,               // established TCP connections to a port we listen on
+    conns_out: 0,              // established TCP connections we opened
+    listening: 0,              // listening TCP ports
+    ports: [],                 // [{port, svc}]
+    peers: [],                 // busiest peers: [{ip, port, dir: in|out, n, svc, scope: lan|wan, host?}]
+  },
+
+  starlink: {                  // the dish (scripts/examples/starlink.sh). Shown on the HUD.
+    online: false,
+    state: '',                 // OKAY, or the dish's disablement code
+    latency_ms: 0,             // PoP ping
+    drop_rate: 0,              // 0..1 PoP ping drop
+    down_bps: 0,
+    up_bps: 0,
+    obstructed: false,         // currently obstructed
+    fraction_obstructed: 0,    // 0..1
+    snr_ok: true,
+    gps_sats: 0,
+    azimuth: 0,                // boresight, degrees
+    elevation: 0,
+    uptime: 0,                 // dish uptime, seconds
+    software: '',
+    hardware: '',
+    eth_mbps: 0,
+    alerts: [],                // ['thermal_throttle', ...]
+    updated: 0,                // ms; the HUD flags the dish as stale after 2 minutes
   },
 
   crew: {                      // the framed crew photo — who's home

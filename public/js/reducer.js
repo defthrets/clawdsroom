@@ -52,6 +52,18 @@ export function coerce(v) {
   return v;
 }
 
+// One history sample of the headline numbers (the trend charts in the room and the HUD).
+export function historySample(state, t = Date.now()) {
+  const sys = state.system || {}, pw = state.power || {}, net = state.network || {}, sl = state.starlink || {};
+  return {
+    t, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null,
+    battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null,
+    rx_bps: net.rx_bps ?? null, tx_bps: net.tx_bps ?? null, conns_in: net.conns_in ?? null, conns_out: net.conns_out ?? null,
+    sl_down: sl.online ? sl.down_bps ?? null : null, sl_up: sl.online ? sl.up_bps ?? null : null,
+    sl_ms: sl.online ? sl.latency_ms ?? null : null, sl_drop: sl.online ? sl.drop_rate ?? null : null,
+  };
+}
+
 const MAX_EVENTS = 60;
 
 // Apply an event to the state. Returns a NEW state object (does not mutate).

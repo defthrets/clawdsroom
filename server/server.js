@@ -2,12 +2,13 @@
 // Clawd's Room server. Zero dependencies.
 //
 //   GET  /                  the room (open this on the iPad)
+//   GET  /hud/              the ops HUD: homelab, Starlink and connections (the second iPad)
 //   GET  /api/state         full state JSON
 //   POST /api/state         deep-merge a patch into the state (JSON body, or ?dotted.keys=values)
 //   PUT  /api/state         replace the whole state (merged over defaults)
 //   POST /api/event         push an event {type, ...}; also updates counters, see docs/STATE.md
 //   GET  /api/events        recent events
-//   GET  /api/history       recent samples of cpu/ram/temp/battery/solar (for the trend charts)
+//   GET  /api/history       recent samples of cpu/ram/temp/battery/solar/net/starlink (for the trend charts)
 //   GET  /api/stream        Server-Sent Events: "state" and "event" messages
 //   GET  /api/health        {ok: true}
 //
@@ -21,7 +22,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_STATE } from '../public/js/defaults.js';
-import { applyEvent, clone, coerce, deepMerge, expandDots, isObj } from '../public/js/reducer.js';
+import { applyEvent, clone, coerce, deepMerge, expandDots, historySample, isObj } from '../public/js/reducer.js';
 import { collectSystem } from './system.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -81,8 +82,7 @@ function sampleHistory() {
   const now = Date.now();
   const last = history[history.length - 1];
   if (last && now - last.t < HISTORY_INTERVAL_MS) return;
-  const sys = state.system || {}, pw = state.power || {};
-  history.push({ t: now, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null, battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null });
+  history.push(historySample(state, now));
   if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
 }
 

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Clawd HUD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clawd HUD">
+  <meta name="theme-color" content="#02050b">
+  <meta name="description" content="Clawd's ops HUD: the homelab, the Starlink dish and every connection in and out, live.">
+  <link rel="manifest" href="/hud/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/hud/hud.css">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div id="stage" class="stage">
+    <header class="top">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 9 23 13v6l-7 4-7-4v-6Z" fill="currentColor" opacity=".35"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/></svg>
+        <div>
+          <div class="brand-name">CLAWD<span>//</span>OPS</div>
+          <div class="brand-sub"><span id="host">192.168.1.253</span> · <span id="mode" class="mode">LINK…</span></div>
+        </div>
+      </div>
+      <div class="now">
+        <div class="now-k">OPERATOR</div>
+        <div class="now-v" id="now">Clawd is settling in…</div>
+      </div>
+      <div class="alerts" id="alerts"></div>
+      <div class="clock">
+        <div class="clock-t" id="clock">--:--<span id="secs">:--</span></div>
+        <div class="clock-d" id="date">---</div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- left: the homelab itself + power -->
+      <section class="panel core">
+        <h2><i></i>CORE <b>// HOMELAB</b><em id="uptime">UP —</em></h2>
+        <div class="rings">
+          <div class="ring" id="r-cpu"></div>
+          <div class="ring" id="r-ram"></div>
+          <div class="ring" id="r-temp"></div>
+        </div>
+        <div class="bars">
+          <div class="bar" id="b-root"><span class="bk">DISK /</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+          <div class="bar" id="b-mnt"><span class="bk">DISK /MNT</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+          <div class="bar" id="b-fan"><span class="bk">FAN</span><span class="bt"><i></i></span><span class="bv">—</span></div>
+        </div>
+        <div class="kv3">
+          <div><span>LOAD</span><b id="load">—</b></div>
+          <div><span>/MNT</span><b id="mnt-gb">—</b></div>
+          <div><span>SUBAGENTS</span><b id="agents">0</b></div>
+        </div>
+        <div class="chart-head"><span>CPU · RAM <em>6H</em></span><span class="legend"><i class="sw c-cpu"></i>CPU <i class="sw c-ram"></i>RAM</span></div>
+        <canvas id="c-core" class="chart"></canvas>
+      </section>
+
+      <section class="panel power">
+        <h2><i></i>POWER <b>// FOXESS</b><em id="pw-state">—</em></h2>
+        <div class="power-row">
+          <div class="ring big" id="r-bat"></div>
+          <div class="flows">
+            <div class="flow"><span>SOLAR</span><b id="pw-solar">—</b></div>
+            <div class="flow"><span>LOAD</span><b id="pw-load">—</b></div>
+            <div class="flow"><span>GRID</span><b id="pw-grid">—</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- centre: the dish -->
+      <section class="panel uplink">
+        <h2><i></i>UPLINK <b>// STARLINK</b><em id="sl-state">—</em></h2>
+        <div class="sky-wrap">
+          <canvas id="c-sky"></canvas>
+          <div class="sky-hud tl"><span>DOWN</span><b id="sl-down">—</b></div>
+          <div class="sky-hud tr"><span>UP</span><b id="sl-up">—</b></div>
+          <div class="sky-hud bl"><span>PING</span><b id="sl-ping">—</b></div>
+          <div class="sky-hud br"><span>DROP</span><b id="sl-drop">—</b></div>
+          <div class="sky-off hidden" id="sl-off">NO SIGNAL</div>
+        </div>
+        <div class="chips" id="sl-chips"></div>
+        <div class="chart-head"><span>THROUGHPUT <em id="tp-unit">Mb/s</em></span><span class="legend"><i class="sw c-down"></i>DOWN <i class="sw c-up"></i>UP<button class="range" id="range">LIVE</button></span></div>
+        <canvas id="c-tp" class="chart tall"></canvas>
+        <div class="chart-head"><span>LATENCY <em>ms</em></span><span class="legend"><i class="sw c-ms"></i>PING <i class="sw c-drop"></i>DROPS</span></div>
+        <canvas id="c-ms" class="chart"></canvas>
+      </section>
+
+      <!-- right: who we're talking to -->
+      <section class="panel net">
+        <h2><i></i>NET <b>// CONNECTIONS</b><em id="iface">—</em></h2>
+        <div class="radar-wrap">
+          <canvas id="c-radar"></canvas>
+        </div>
+        <div class="counters">
+          <div class="cnt in"><span>▼ IN</span><b id="n-in">0</b></div>
+          <div class="cnt out"><span>▲ OUT</span><b id="n-out">0</b></div>
+          <div class="cnt"><span>LISTEN</span><b id="n-listen">0</b></div>
+          <div class="cnt"><span>RX</span><b id="n-rx">—</b></div>
+          <div class="cnt"><span>TX</span><b id="n-tx">—</b></div>
+        </div>
+        <div class="peers-head"><span>DIR</span><span>PEER</span><span>SERVICE</span><span>N</span></div>
+        <div class="peers" id="peers"></div>
+        <div class="ports" id="ports"></div>
+      </section>
+    </main>
+
+    <footer class="bottom">
+      <div class="tiles" id="tiles"></div>
+      <div class="panel log">
+        <h2><i></i>EVENT <b>// LOG</b></h2>
+        <div class="log-lines" id="log"></div>
+      </div>
+    </footer>
+
+    <div class="scan" aria-hidden="true"></div>
+  </div>
+  <script type="module" src="/hud/hud.js"></script>
+</body>
+</html>

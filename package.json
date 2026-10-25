@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node --watch server/server.js",
-    "check": "node --check server/server.js && node --check server/system.js && node --check public/js/defaults.js && node --check public/js/reducer.js",
+    "check": "node --check server/server.js && node --check server/system.js && node --check server/network.js && node --check public/hud/hud.js && node --check public/js/defaults.js && node --check public/js/reducer.js",
     "test": "node --test test/*.test.js"
   },
   "engines": {

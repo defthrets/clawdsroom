@@ -1,0 +1,14 @@
+{
+  "name": "Clawd HUD",
+  "short_name": "Clawd HUD",
+  "start_url": "/hud/",
+  "scope": "/hud/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#02050b",
+  "theme_color": "#02050b",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
