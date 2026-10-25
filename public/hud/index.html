@@ -118,43 +118,59 @@
       </div>
     </footer>
 
-    <!-- comms: talk to the agents -->
-    <section class="panel comms hidden" id="comms" role="dialog" aria-label="Comms">
-      <h2><i></i>COMMS <b>// VOICE LINK</b><button class="cm-close" id="cm-close" aria-label="close">✕</button></h2>
-      <div class="cm-body">
-        <div class="cm-ctl">
-          <div class="cm-k">CHANNEL</div>
-          <div class="cm-agents" id="cm-agents"></div>
-          <div class="cm-mode">
-            <button class="sel" data-mode="talk">TALK</button>
-            <button data-mode="note">VOICE NOTE</button>
+    <!-- comms: the neural link to the agents -->
+    <section class="comms hidden" id="comms" role="dialog" aria-label="Comms">
+      <div class="nl-frame"></div>
+      <header class="nl-top">
+        <div class="nl-title"><span class="nl-glyph">◢</span>NEURAL LINK <b>//</b> <span id="cm-title">CLAWD</span></div>
+        <div class="nl-chips" id="cm-chips"></div>
+        <button class="nl-close" id="cm-close" aria-label="close"><span>✕</span></button>
+      </header>
+      <div class="nl-body">
+        <div class="nl-stage">
+          <div class="nl-agents" id="cm-agents"></div>
+          <div class="nl-read tl"><span>SIGNAL</span><b id="cm-sig">—</b></div>
+          <div class="nl-read tr"><span>AMPLITUDE</span><b id="cm-amp">—</b></div>
+          <div class="nl-read bl"><span>CHANNEL</span><b id="cm-chan">—</b></div>
+          <div class="nl-read br"><span>T+</span><b id="cm-clock">00:00</b></div>
+          <canvas id="cm-core" class="nl-core" aria-label="hold to talk"></canvas>
+          <div class="nl-state" id="cm-state">STANDBY</div>
+          <div class="nl-caption" id="cm-caption"></div>
+          <div class="nl-controls">
+            <button class="nl-side" id="cm-cancel" disabled>✕ DISCARD</button>
+            <div class="nl-mode" role="radiogroup">
+              <button class="sel" data-mode="talk"><i></i>TALK</button>
+              <button data-mode="note"><i></i>VOICE NOTE</button>
+            </div>
+            <button class="nl-side sel" id="cm-speak">VOICE ON</button>
           </div>
-          <div class="cm-ptt-wrap">
-            <canvas id="cm-level"></canvas>
-            <button class="cm-ptt" id="cm-ptt" aria-label="hold to talk">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              <span id="cm-ptt-label">HOLD TO TALK</span>
-            </button>
-          </div>
-          <div class="cm-live hidden" id="cm-live"></div>
-          <div class="cm-hint" id="cm-hint"></div>
-          <div class="cm-row">
-            <button class="cm-cancel hidden" id="cm-cancel">✕ DISCARD</button>
-            <button class="cm-speak sel" id="cm-speak">🔊 SPEAK REPLIES</button>
-          </div>
+          <div class="nl-hint" id="cm-hint"></div>
         </div>
-        <div class="cm-chat">
-          <div class="cm-k">THREAD <b>// <span id="cm-title">CLAWD</span></b></div>
-          <div class="cm-thread" id="cm-thread"></div>
-          <div class="cm-input">
-            <input id="cm-input" type="text" placeholder="or type a message…" autocomplete="off" enterkeyhint="send">
+        <aside class="nl-log">
+          <div class="nl-k"><span>COMM LOG</span><em id="cm-count">0</em></div>
+          <div class="nl-thread" id="cm-thread"></div>
+          <div class="nl-input">
+            <span class="nl-prompt">&gt;</span>
+            <input id="cm-input" type="text" placeholder="transmit text…" autocomplete="off" enterkeyhint="send">
             <button id="cm-send">SEND</button>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
 
     <div class="scan" aria-hidden="true"></div>
+
+    <div class="boot" aria-hidden="true">
+      <div class="boot-in">
+        <div class="boot-logo"><svg viewBox="0 0 32 32"><path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 9 23 13v6l-7 4-7-4v-6Z" fill="currentColor" opacity=".35"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/></svg>CLAWD<span>//</span>OPS</div>
+        <div class="boot-line">INITIALISING HOMELAB CORE ........................ <b>OK</b></div>
+        <div class="boot-line">FOXESS POWER BUS ................................. <b>OK</b></div>
+        <div class="boot-line">STARLINK UPLINK .................................. <b>OK</b></div>
+        <div class="boot-line">NET RADAR · PEER TRACKING ........................ <b>OK</b></div>
+        <div class="boot-line">NEURAL LINK · HERMES AGENT ....................... <b>OK</b></div>
+        <div class="boot-bar"><i></i></div>
+      </div>
+    </div>
   </div>
   <script type="module" src="/hud/hud.js"></script>
 </body>

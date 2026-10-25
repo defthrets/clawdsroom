@@ -112,19 +112,21 @@ scripts/examples/starlink.sh --loop 5     # every 5s, forever (or cron it once a
 ### Talking to Clawd from the HUD
 
 Clawd runs on [Hermes Agent](https://hermes-agent.nousresearch.com/), and the HUD talks to him through Hermes
-Agent's API server. Tap **COMMS** in the HUD's top bar to open the voice link, then either:
+Agent's API server. Tap **COMMS** in the HUD's top bar and the **neural link** takes over the screen. In the middle is
+a holographic core: it breathes on standby, ripples with your voice while it listens, swirls amber while Clawd
+thinks (with the tool he is using underneath), and pulses as he answers while his words light up karaoke-style. Then either:
 
 ![Comms](docs/hud-comms.png)
 
-* **TALK**: hold the big button and speak (or tap once to start and again to send). Clawd's reply
+* **TALK**: hold the core and speak (or tap it once to start and again to send). Clawd's reply
   appears in the thread and is **read out loud** on the iPad, and the console opens itself when it
   arrives. While he works, the tool he is using shows under your message (`⚙ terminal: ...`). His reply
   also comes out of his mouth in the room.
-* **VOICE NOTE**: the same button leaves a recorded message. The audio is kept and Clawd gets it as a
+* **VOICE NOTE**: the same core leaves a recorded message. The audio is kept and Clawd gets it as a
   voice message with the transcript and a link to the recording.
-* Or type into the box under the thread.
+* Or type into the box under the comm log.
 
-Every message and reply stays in the thread with a ▶ to play the audio back. The console closes on its
+Every message and reply stays in the comm log (new replies decrypt into place), with a ▶ to play the audio back. The console closes on its
 own after 90 seconds of quiet.
 
 Setting it up:
