@@ -18,6 +18,9 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
+import { Hermes, hermesBase, hermesChat, parseSseBlock, progressLabel } from './hermes.js';
+
+export { hermesBase, hermesChat, parseSseBlock, progressLabel }; // for the tests and older imports
 
 const LOG_MAX = 60;
 const TRACE_KEEP = 6;      // full traces (with reasoning) kept on the newest messages; older ones keep their steps
@@ -71,34 +74,6 @@ async function fetchJson(url, opts, timeoutMs) {
   } finally { clearTimeout(timer); }
 }
 
-// Hermes Agent base URL (with an optional multiplexed profile), from whatever form the config gives.
-export function hermesBase(cfg) {
-  const base = String(cfg.url || 'http://127.0.0.1:8642').replace(/\/+$/, '').replace(/\/v1(\/chat\/completions)?$/, '');
-  return cfg.profile ? `${base}/p/${encodeURIComponent(cfg.profile)}` : base;
-}
-
-// One SSE block → {event, data} (data parsed as JSON when it can be).
-export function parseSseBlock(block) {
-  let event = 'message';
-  const data = [];
-  for (const line of block.split(/\r?\n/)) {
-    if (line.startsWith('event:')) event = line.slice(6).trim();
-    else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
-  }
-  if (!data.length) return null;
-  const raw = data.join('\n');
-  try { return { event, data: JSON.parse(raw), raw }; } catch { return { event, data: null, raw }; }
-}
-
-// A short label for a Hermes tool-progress event, whatever shape it comes in.
-export function progressLabel(d) {
-  if (!d || typeof d !== 'object') return '';
-  const p = d.progress || d.tool_progress || d;
-  const name = p.tool || p.tool_name || p.name || p.function || '';
-  const what = p.label || p.message || p.status || p.summary || '';
-  return String([name, what].filter(Boolean).join(': ')).slice(0, 80);
-}
-
 // The steps of one turn as the HUD shows them: what Clawd did, what he was thinking, what he is writing.
 // Changes are flushed at most every 300ms (always at once for a new step).
 export class Trace {
@@ -115,6 +90,19 @@ export class Trace {
     if (this.steps.length > 40) this.steps.splice(1, 1);
     if (kind === 'tool') this.tool = s.text;
     this.kick(true);
+  }
+  // A step that started earlier has finished (a tool or a sub-agent): note how long and whether it failed.
+  finish(kind, text, fields = {}) {
+    for (let i = this.steps.length - 1; i >= 0; i--) {
+      const s = this.steps[i];
+      if (s.kind === kind && s.text === String(text).slice(0, 160) && !s.finished) {
+        Object.assign(s, fields, { finished: true });
+        if (fields.ms != null) s.end = s.at + fields.ms;
+        this.kick(true);
+        return;
+      }
+    }
+    this.step(kind, text, { ...fields, finished: true });
   }
   think(delta) {
     if (this.steps[this.steps.length - 1]?.kind !== 'reason') this.step('reason', 'REASONING');
@@ -142,61 +130,6 @@ export class Trace {
   }
 }
 
-// POST a streamed chat completion to Hermes Agent; returns the reply text. onEvent gets
-// {type: 'tool', label} | {type: 'tool_call', name} | {type: 'reasoning', delta} | {type: 'content', delta} as they stream.
-// The timeout is for silence, not the whole turn: Hermes sends keepalives while it works.
-export async function hermesChat(url, { key, session, sessionKey, model, messages }, { idleMs = 300000, onEvent = () => {} } = {}) {
-  const ac = new AbortController();
-  let timer = setTimeout(() => ac.abort(), idleMs);
-  const poke = () => { clearTimeout(timer); timer = setTimeout(() => ac.abort(), idleMs); };
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      signal: ac.signal,
-      headers: {
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
-        ...(key ? { Authorization: `Bearer ${key}` } : {}),
-        ...(session ? { 'X-Hermes-Session-Id': session } : {}),
-        ...(sessionKey ? { 'X-Hermes-Session-Key': sessionKey } : {}),
-      },
-      body: JSON.stringify({ model: model || 'hermes-agent', messages, stream: true }),
-    });
-    if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 160)}`);
-    if (!/event-stream/.test(r.headers.get('content-type') || '')) {
-      const j = await r.json();
-      return j.choices?.[0]?.message?.content ?? '';
-    }
-    let text = '', buf = '';
-    const dec = new TextDecoder();
-    for await (const chunk of r.body) {
-      poke();
-      buf += dec.decode(chunk, { stream: true });
-      let i;
-      while ((i = buf.search(/\r?\n\r?\n/)) >= 0) {
-        const block = buf.slice(0, i);
-        buf = buf.slice(i).replace(/^\r?\n\r?\n/, '');
-        const ev = parseSseBlock(block);
-        if (!ev) continue;
-        if (ev.raw === '[DONE]') return text;
-        const d = ev.data;
-        if (/tool\.progress/.test(ev.event) || /tool\.progress/.test(String(d?.object || d?.type || ''))) { onEvent({ type: 'tool', label: progressLabel(d) }); continue; }
-        const ch = d?.choices?.[0];
-        if (!ch) continue;
-        const delta = ch.delta || {};
-        const thought = delta.reasoning_content ?? delta.reasoning;
-        if (typeof thought === 'string' && thought) onEvent({ type: 'reasoning', delta: thought });
-        for (const tc of delta.tool_calls || []) if (tc.function?.name) onEvent({ type: 'tool_call', name: tc.function.name });
-        if (delta.content) { text += delta.content; onEvent({ type: 'content', delta: delta.content }); }
-        if (ch.finish_reason === 'error' || ch.finish_reason === 'cancelled') throw new Error(`Hermes ended the turn: ${ch.finish_reason}`);
-      }
-    }
-    return text;
-  } catch (e) {
-    throw new Error(e.name === 'AbortError' ? `no word from Hermes for ${Math.round(idleMs / 1000)}s` : e.message);
-  } finally { clearTimeout(timer); }
-}
-
 export class Comms {
   // hooks: getState(), patch(patch), event(ev)
   constructor({ dataDir, agentsFile, hooks, env = process.env }) {
@@ -206,6 +139,55 @@ export class Comms {
     this.env = env;
     this.cache = { mtime: -1, agents: DEFAULT_AGENTS };
     this.health = new Map(); // agent id → {at, online}
+    this.clients = new Map(); // agent id → {key, client: Hermes}
+    this.active = new Map(); // entry id → {ac, client, runId} while a turn is running
+  }
+
+  // One Hermes client per agent, rebuilt when its config changes.
+  hermesFor(id, cfg) {
+    const key = JSON.stringify(cfg);
+    const hit = this.clients.get(id);
+    if (hit && hit.key === key) return hit.client;
+    const client = new Hermes(cfg);
+    this.clients.set(id, { key, client });
+    return client;
+  }
+
+  hermesAgent(id) {
+    const raw = this.agents()[id];
+    if (!raw || raw.type !== 'hermes') throw Object.assign(new Error(`"${id}" is not a Hermes Agent link`), { status: 400 });
+    return this.hermesFor(id, interpolate(raw, this.env));
+  }
+
+  overview(id, opts) { return this.hermesAgent(id).overview(opts); }
+  jobAction(id, job, action) { return this.hermesAgent(id).jobAction(job, action); }
+
+  // Stop a turn that is still running (the run on Hermes too, when it is one).
+  async stop(entryId) {
+    const act = this.active.get(entryId);
+    if (!act) throw Object.assign(new Error('nothing running for that message'), { status: 409 });
+    if (act.runId) await act.client.stop(act.runId).catch((e) => console.warn(`[comms] stop: ${e.message}`));
+    act.ac.abort();
+    return { ok: true };
+  }
+
+  // Answer an approval or a clarifying question that Hermes is waiting on.
+  async control(entryId, { choice, answer }) {
+    const entry = this.log().find((e) => e.id === entryId);
+    const act = this.active.get(entryId);
+    if (!entry?.control || !act?.runId) throw Object.assign(new Error('nothing is waiting on you for that message'), { status: 409 });
+    const c = entry.control;
+    if (c.type === 'clarify') {
+      if (!String(answer ?? '').trim()) throw Object.assign(new Error('needs an "answer"'), { status: 400 });
+      await act.client.clarify(act.runId, c, String(answer).slice(0, 2000));
+      act.trace?.step('ask', `ANSWERED: ${String(answer).slice(0, 80)}`);
+    } else {
+      const ch = String(choice || 'deny');
+      await act.client.approve(act.runId, c, ch);
+      act.trace?.step('auth', ch === 'deny' ? 'DENIED FROM THE HUD' : `APPROVED (${ch.toUpperCase()}) FROM THE HUD`);
+    }
+    this.update(entryId, { control: null });
+    return { ok: true };
   }
 
   // ------------------------------------------------------------ config
@@ -370,7 +352,7 @@ export class Comms {
       await this.deliverTraced(entry, rawCfg, baseUrl, trace);
     } catch (e) {
       trace.close('fail', e.message.slice(0, 120));
-      this.update(entry.id, { trace: trace.snapshot(true) });
+      this.update(entry.id, { control: null, trace: trace.snapshot(true) });
       throw e;
     }
   }
@@ -396,21 +378,40 @@ export class Comms {
 
     let reply = '';
     if (cfg.type === 'hermes') {
-      const messages = [];
-      if (cfg.system) messages.push({ role: 'system', content: cfg.system });
-      messages.push({ role: 'user', content: compose(entry) });
-      reply = await hermesChat(`${hermesBase(cfg)}/v1/chat/completions`, {
-        key: cfg.key, model: cfg.model, messages,
-        session: cfg.session || `${entry.to}-hud`, sessionKey: cfg.session_key || cfg.session || `${entry.to}-hud`,
-      }, {
-        idleMs: timeout,
-        onEvent: (ev) => {
-          if (ev.type === 'tool' && ev.label) trace.step('tool', ev.label);
-          else if (ev.type === 'tool_call') trace.step('tool', ev.name);
-          else if (ev.type === 'reasoning') trace.think(ev.delta);
-          else if (ev.type === 'content') trace.write(ev.delta);
-        },
-      });
+      const client = this.hermesFor(entry.to, cfg);
+      const session = cfg.session || `${entry.to}-hud`;
+      const act = { ac: new AbortController(), client, runId: null, trace };
+      this.active.set(entry.id, act);
+      const onEvent = (ev) => {
+        if (ev.type === 'run') { act.runId = ev.id; this.update(entry.id, { run: ev.id }); }
+        else if (ev.type === 'tool' && ev.label) trace.step('tool', ev.label, ev.detail ? { detail: ev.detail } : {});
+        else if (ev.type === 'tool_call') trace.step('tool', ev.name);
+        else if (ev.type === 'tool_done') trace.finish('tool', ev.label, { ms: ev.ms, error: ev.error || null, ...(ev.detail ? { detail: ev.detail } : {}) });
+        else if (ev.type === 'agent') trace.step('agent', ev.label);
+        else if (ev.type === 'agent_done') trace.finish('agent', ev.label, { detail: ev.detail });
+        else if (ev.type === 'interim') trace.step('interim', ev.text);
+        else if (ev.type === 'reasoning') trace.think(ev.delta);
+        else if (ev.type === 'content') trace.write(ev.delta);
+        else if (ev.type === 'control') {
+          trace.step(ev.control.type === 'clarify' ? 'ask' : 'auth', ev.control.type === 'clarify' ? `QUESTION: ${ev.control.title}` : `AUTHORIZATION: ${ev.control.detail || ev.control.title}`);
+          this.update(entry.id, { control: ev.control, status: 'thinking' });
+          this.hooks.event({ type: 'comms', from: entry.to, to: 'you', kind: ev.control.type, text: ev.control.title });
+        } else if (ev.type === 'control_clear') this.update(entry.id, { control: null });
+      };
+      try {
+        if (await client.useRuns()) {
+          reply = await client.runTurn({ input: compose(entry), session, instructions: cfg.system }, { idleMs: timeout, onEvent, signal: act.ac.signal });
+        } else {
+          const messages = [];
+          if (cfg.system) messages.push({ role: 'system', content: cfg.system });
+          messages.push({ role: 'user', content: compose(entry) });
+          reply = await hermesChat(`${hermesBase(cfg)}/v1/chat/completions`, {
+            key: cfg.key, model: cfg.model, messages, session, sessionKey: cfg.session_key || session,
+          }, { idleMs: timeout, onEvent, signal: act.ac.signal });
+        }
+      } finally {
+        this.active.delete(entry.id);
+      }
     } else if (cfg.type === 'openai') {
       const messages = [];
       if (cfg.system) messages.push({ role: 'system', content: cfg.system });
@@ -442,7 +443,7 @@ export class Comms {
       throw new Error(`unknown type "${cfg.type}"`);
     }
     trace.close('done', 'RESPONSE RECEIVED');
-    this.update(entry.id, { status: 'delivered', progress: null, trace: trace.snapshot(true) });
+    this.update(entry.id, { status: 'delivered', progress: null, control: null, trace: trace.snapshot(true) });
     reply = String(reply || '').trim();
     if (reply) await this.reply({ from: entry.to, text: reply, replyTo: entry.id });
   }

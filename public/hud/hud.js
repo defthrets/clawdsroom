@@ -5,6 +5,7 @@ import { Store } from '/js/state.js';
 import { connect } from '/js/net.js';
 import { fmtUptime, fmtAgo, clamp } from '/js/util.js';
 import { initComms } from '/hud/comms.js';
+import { initSystems } from '/hud/systems.js';
 
 const STAGE_W = 1133, STAGE_H = 744;
 const STALE_MS = 120000;           // Starlink counts as stale after 2 minutes without a push
@@ -708,6 +709,7 @@ connect(store, {
 });
 
 const comms = initComms(store, { $, params });
+const systems = initSystems(store, { $, auth: comms.auth });
 
 resize();
 tickClock();
@@ -750,4 +752,4 @@ setInterval(() => {
   if (hours > 0 && performance.now() > hours * 3600 * 1000) location.reload();
 }, 60000);
 
-window.hud = { store, live, comms };
+window.hud = { store, live, comms, systems };

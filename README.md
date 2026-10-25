@@ -133,7 +133,31 @@ of the core as a labelled node and orbits while he works. Once he starts writing
 and the answer forms in the caption before it is spoken. Afterwards, tap **▸ TRACE** under any message in the comm log
 to see that turn's steps, timings and reasoning again.
 
-These come from Hermes Agent's stream: tool steps from its `hermes.tool.progress` events (on by default,
+**His terminal, on the wall.** When Hermes Agent offers its Runs API (the HUD checks `/v1/capabilities`), turns go through
+it instead of plain chat, and the HUD gets what his terminal shows:
+
+* every tool call with the command it ran (`docker system df`), what came back, how long it took, and a red ✕ if it failed
+* sub-agents he delegates to, with their status, time and cost
+* **AUTHORIZATION REQUIRED**: when Clawd wants to run something Hermes flags as dangerous, the whole HUD turns into a
+  red hazard alert with the exact command, and says so out loud. **APPROVE ONCE** or **DENY** right there; he stays
+  paused until you decide
+* **CLARIFICATION REQUESTED**: when he needs to ask you something, the question comes up in amber with its options and
+  an answer box
+* **■ ABORT** on the neural link stops a turn that is running, on Hermes too
+
+![Authorization](docs/hud-auth.png)
+
+**HERMES // SYSTEMS.** The **HERMES** button in the top bar opens everything around Clawd on Hermes Agent: core status
+and readiness checks, his model and providers, capability flags, a hex matrix of his **skills**, his **toolsets** (which are
+on, which tools each has), his **scheduled jobs** with next run and last result plus ▶ run now and ❚❚ pause / ↻ resume,
+and his recent **sessions** across Telegram, Discord, cron and the HUD. It resyncs every 20 seconds.
+
+![Hermes systems](docs/hud-hermes.png)
+
+In demo mode (`/hud/?demo=1`) all of it is simulated; ask the neural link to "clear the docker cache" to see an
+authorization. Set `"api": "chat"` on the `clawd` entry to force plain chat completions, or `"api": "runs"` to force runs.
+
+The live trace comes from Hermes Agent's stream: tool steps from its `hermes.tool.progress` events (on by default,
 `gateway.platforms.api_server.tool_progress_events`), reasoning from `reasoning_content` when the model streams it
 (some models and providers don't, and the panel says so), and the answer as it is written.
 

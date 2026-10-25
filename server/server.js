@@ -16,6 +16,8 @@
 //   POST /api/comms/voice   ?to=&kind=&text= with the audio as the body: a voice message
 //   POST /api/comms/reply   {from, text, audio_url?} (or audio body + ?from=&text=): an agent answers
 //   GET  /api/comms/audio/<file>
+//   POST /api/comms/stop {id}  ·  POST /api/comms/control {id, choice | answer}: stop a turn, answer an approval/question
+//   GET  /api/hermes/overview?agent=clawd  ·  POST /api/hermes/jobs/<id>/run|pause|resume: Hermes Agent's system
 //
 // Env: PORT (8787), HOST (0.0.0.0), CLAWDSROOM_TOKEN (optional bearer token for writes),
 //      DATA_DIR (./data), COLLECT_SYSTEM (1 on Linux), DISK_ROOT (/), DISK_MNT (/mnt),
@@ -280,6 +282,9 @@ async function handle(req, res) {
       return send(res, 200, comms.log().filter((e) => (!who || e.from === who || e.to === who) && e.at > since));
     }
     if (p.startsWith('/api/comms/audio/') && (req.method === 'GET' || req.method === 'HEAD')) return comms.serveAudio(req, res, p.slice('/api/comms/audio/'.length));
+    if (p === '/api/hermes/overview' && req.method === 'GET') {
+      return send(res, 200, await comms.overview(url.searchParams.get('agent') || 'clawd', { fresh: url.searchParams.has('fresh') }));
+    }
 
     const writing = req.method === 'POST' || req.method === 'PUT';
     if (writing && !authorized(req, url)) return send(res, 401, { error: 'unauthorized' });
@@ -321,6 +326,17 @@ async function handle(req, res) {
       const audio = await comms.saveAudio(buf, req.headers['content-type']);
       const entry = comms.send({ to, kind: url.searchParams.get('kind'), text: url.searchParams.get('text') || '', audio, baseUrl });
       return send(res, 200, { ok: true, entry });
+    }
+
+    if ((p === '/api/comms/stop' || p === '/api/comms/control') && req.method === 'POST') {
+      const body = parseBody(await readBody(req), req.headers['content-type'] || '');
+      if (!isObj(body) || !body.id) return send(res, 400, { error: 'needs the message "id"' });
+      return send(res, 200, p === '/api/comms/stop' ? await comms.stop(String(body.id)) : await comms.control(String(body.id), body));
+    }
+
+    const job = p.match(/^\/api\/hermes\/jobs\/([^/]+)\/(run|pause|resume)$/);
+    if (job && req.method === 'POST') {
+      return send(res, 200, await comms.jobAction(url.searchParams.get('agent') || 'clawd', decodeURIComponent(job[1]), job[2]));
     }
 
     if (p === '/api/comms/reply' && req.method === 'POST') {

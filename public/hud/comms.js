@@ -15,7 +15,8 @@ const hms = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d
 const mmss = (s) => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
 const STATUS = { sending: 'TRANSMITTING', transcribing: 'TRANSCRIBING', thinking: 'PROCESSING', delivered: 'DELIVERED', queued: 'QUEUED · NO LINK', failed: 'FAILED', received: '' };
 const PENDING = new Set(['sending', 'transcribing', 'thinking']);
-const STEP_ICON = { rx: '◈', stt: '≋', link: '⟁', tool: '⚙', reason: '◌', compose: '✎', done: '✓', fail: '✕', queue: '⧗' };
+const STEP_ICON = { rx: '◈', stt: '≋', link: '⟁', tool: '⚙', agent: '⧉', interim: '❝', auth: '⚠', ask: '?', reason: '◌', compose: '✎', done: '✓', fail: '✕', queue: '⧗' };
+const CHOICE_LABEL = { once: 'APPROVE ONCE', session: 'APPROVE · SESSION', always: 'ALWAYS ALLOW', deny: 'DENY' };
 const secs = (ms) => `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 
 export function initComms(store, { $, params }) {
@@ -178,7 +179,7 @@ export function initComms(store, { $, params }) {
     const tr = e.trace, n = tr.steps.length, tools = tr.steps.filter((s) => s.kind === 'tool').length;
     const head = `<button class="tr-btn" data-trace="${esc(e.id)}">${openTraces.has(e.id) ? '▾' : '▸'} TRACE · ${n} STEPS${tools ? ` · ${tools} TOOL${tools > 1 ? 'S' : ''}` : ''} · ${secs(tr.ms)}</button>`;
     if (!openTraces.has(e.id)) return head;
-    const list = tr.steps.map((s) => `<li class="${esc(s.kind)}"><b>${STEP_ICON[s.kind] || '·'} ${esc(s.text)}</b><span>${secs(s.at)}</span></li>`).join('');
+    const list = tr.steps.map((s) => `<li class="k-${esc(s.kind)}${s.error ? ' k-fail' : ''}"><b>${STEP_ICON[s.kind] || '·'} ${esc(s.text)}${s.detail ? ` <small>· ${esc(s.detail)}</small>` : ''}</b><span>${s.ms != null ? secs(s.ms) : secs(s.at)}</span></li>`).join('');
     return `${head}<ul class="tr-list">${list}</ul>${tr.reasoning ? `<div class="tr-thought">${esc(tr.reasoning)}</div>` : ''}`;
   }
 
@@ -264,40 +265,65 @@ export function initComms(store, { $, params }) {
     hintTimer = setTimeout(() => { ui.hint.classList.remove('bad'); ui.hint.textContent = baseHint(); }, 4000);
   }
 
-  // Demo mode has no server: fake a traced round trip so the link can be tried.
-  function demoExchange({ text }) {
+  // Demo mode has no server: fake a traced round trip so the link can be tried. Ask it to clear,
+  // delete or restart something and it stops for your authorization, like Hermes does.
+  const demoStop = new Set(), demoAnswer = new Map();
+  async function demoExchange({ text }) {
     const id = `d${Date.now().toString(36)}`;
     const t0 = Date.now(), who = current, note = mode === 'note';
+    const risky = /clear|delete|restart|reboot|\brm\b|prune|wipe/i.test(text);
     const steps = [];
     let entry = { id, at: t0, from: 'you', to: current, kind: mode, text, status: 'sending' };
-    const put = (e) => store.patch({ comms: { log: [...log().filter((x) => x.id !== e.id), e].slice(-60) } });
-    const trace = (extra = {}) => ({ t0, ms: Date.now() - t0, done: false, steps: steps.map((s) => ({ ...s })), reasoning: '', partial: '', ...extra });
-    const step = (kind, label) => { const at = Date.now() - t0; if (steps.length) steps[steps.length - 1].end = at; steps.push({ kind, text: label, at }); };
-    const thought = 'They want a status check. The dish is the thing most likely to wobble, so look at Starlink first: ping, drops, obstruction. Then the homelab load. Keep the answer short; it will be read out loud.';
-    const answer = note ? 'Got your voice note. I will pick it up shortly.' : 'All good. Starlink is holding at thirty one milliseconds with no drops, and the homelab is idling at twelve percent.';
-    const timeline = [
-      [0, () => step('rx', note ? 'VOICE NOTE RECEIVED' : 'TEXT PACKET RECEIVED')],
-      [350, () => { entry.status = 'thinking'; step('link', 'UPLINK → HERMES AGENT'); }],
-      [900, () => step('reason', 'REASONING')],
-      [2400, () => { step('tool', 'terminal: grpcurl dish get_status'); entry.progress = 'terminal: grpcurl dish get_status'; }],
-      [3900, () => { step('tool', 'web_search: starlink outage map'); entry.progress = 'web_search: starlink outage map'; }],
-      [5200, () => step('reason', 'REASONING')],
-      [6000, () => step('compose', 'COMPOSING RESPONSE')],
-    ];
     let reasoning = '', partial = '';
-    for (const [at, fn] of timeline) setTimeout(() => { fn(); put({ ...entry, trace: trace({ reasoning, partial }) }); }, at);
-    // reasoning streams in two bursts, the answer streams last
-    const stream = (from, to, src, set) => { const n = src.length; for (let k = 1; k <= 20; k++) setTimeout(() => { set(src.slice(0, Math.round((n * k) / 20))); put({ ...entry, trace: trace({ reasoning, partial }) }); }, from + ((to - from) * k) / 20); };
-    stream(950, 2350, thought.slice(0, 92), (v) => { reasoning = v; });
-    stream(5250, 5950, thought, (v) => { reasoning = v; });
-    stream(6050, 7400, answer, (v) => { partial = v; });
-    setTimeout(() => {
-      step('done', 'RESPONSE RECEIVED');
-      steps[steps.length - 1].end = steps[steps.length - 1].at;
-      entry = { ...entry, status: 'delivered', progress: null, trace: { ...trace({ reasoning }), done: true } };
-      put(entry);
-      put({ id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: answer, status: 'received', reply_to: id });
-    }, 7600);
+    const put = () => store.patch({ comms: { log: [...log().filter((x) => x.id !== entry.id), { ...entry, trace: { t0, ms: Date.now() - t0, done: false, steps: steps.map((s) => ({ ...s })), reasoning, partial } }].slice(-60) } });
+    const step = (kind, label, extra = {}) => { const at = Date.now() - t0; const prev = steps[steps.length - 1]; if (prev && prev.end == null) prev.end = at; steps.push({ kind, text: label, at, ...extra }); if (kind === 'tool') entry.progress = label; put(); };
+    const finish = (label, extra) => { const s = [...steps].reverse().find((x) => x.text === label && !x.finished); if (s) Object.assign(s, extra, { finished: true }); put(); };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const stopped = () => demoStop.has(id);
+    const stream = async (src, ms, set) => { for (let k = 1; k <= 16 && !stopped(); k++) { set(src.slice(0, Math.round((src.length * k) / 16))); put(); await sleep(ms / 16); } };
+    const thought = risky
+      ? 'They want the Docker build cache cleared. Check how big it is first, then prune it. Pruning deletes data, so Hermes will ask for approval before it runs.'
+      : 'They want a status check. The dish is the thing most likely to wobble, so look at Starlink first: ping, drops, obstruction. Then the homelab load. Keep the answer short; it will be read out loud.';
+    const answer = note ? 'Got your voice note. I will pick it up shortly.'
+      : risky ? 'Done. I pruned the Docker build cache and freed 6.4 gigabytes on the root disk.'
+        : 'All good. Starlink is holding at thirty one milliseconds with no drops, and the homelab is idling at twelve percent.';
+    put();
+    step('rx', note ? 'VOICE NOTE RECEIVED' : 'TEXT PACKET RECEIVED');
+    await sleep(350); entry.status = 'thinking'; step('link', 'UPLINK → HERMES AGENT');
+    await sleep(450); step('reason', 'REASONING');
+    await stream(thought.slice(0, 80), 1300, (v) => { reasoning = v; });
+    if (risky) {
+      step('tool', 'terminal', { detail: 'docker system df' }); await sleep(900); finish('terminal', { ms: 640, detail: 'Build Cache  6.4GB  reclaimable' });
+      step('agent', 'disk-auditor'); await sleep(1100); finish('disk-auditor', { detail: 'ok · 1.1s · $0.002' });
+      entry.control = { type: 'approval', request_id: 'demo', execution_generation: 1, title: 'Run a command that deletes data?', detail: 'docker builder prune --all --force', tool: 'terminal', choices: null };
+      step('auth', 'AUTHORIZATION: docker builder prune --all --force');
+      const ans = await new Promise((res) => demoAnswer.set(id, res));
+      demoAnswer.delete(id);
+      entry.control = null;
+      if (ans.choice === 'deny') {
+        step('auth', 'DENIED FROM THE HUD');
+        await sleep(500);
+        step('done', 'RESPONSE RECEIVED'); steps[steps.length - 1].end = steps[steps.length - 1].at;
+        entry = { ...entry, status: 'delivered', progress: null }; put();
+        store.patch({ comms: { log: [...log(), { id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: 'Understood, I left the cache alone. It is still using 6.4 gigabytes.', status: 'received', reply_to: id }].slice(-60) } });
+        return;
+      }
+      step('auth', 'APPROVED (ONCE) FROM THE HUD');
+      step('tool', 'terminal', { detail: 'docker builder prune --all --force' }); await sleep(1400); finish('terminal', { ms: 1380, detail: 'Total reclaimed space: 6.4GB' });
+    } else {
+      step('tool', 'terminal', { detail: 'grpcurl 192.168.100.1:9200 get_status' }); await sleep(1300); finish('terminal', { ms: 1210, detail: 'ping 31ms · drop 0.0% · obstructed 0.4%' });
+      step('tool', 'web_search', { detail: 'starlink outage map today' }); await sleep(1100); finish('web_search', { ms: 980, detail: '3 results · no outages reported' });
+    }
+    if (stopped()) { step('fail', 'stopped from the HUD'); entry = { ...entry, status: 'failed', error: 'stopped from the HUD', progress: null }; put(); return; }
+    step('reason', 'REASONING');
+    await stream(thought, 700, (v) => { reasoning = v; });
+    step('compose', 'COMPOSING RESPONSE');
+    await stream(answer, 1400, (v) => { partial = v; });
+    if (stopped()) { step('fail', 'stopped from the HUD'); entry = { ...entry, status: 'failed', error: 'stopped from the HUD', progress: null }; put(); return; }
+    partial = '';
+    step('done', 'RESPONSE RECEIVED'); steps[steps.length - 1].end = steps[steps.length - 1].at;
+    entry = { ...entry, status: 'delivered', progress: null };
+    store.patch({ comms: { log: [...log().filter((x) => x.id !== id), { ...entry, trace: { t0, ms: Date.now() - t0, done: true, steps, reasoning, partial: '' } }, { id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: answer, status: 'received', reply_to: id }].slice(-60) } });
   }
 
   // ------------------------------------------------------------ recording
@@ -346,7 +372,6 @@ export function initComms(store, { $, params }) {
         r.sr = sr;
       } catch { /* not allowed here */ }
     }
-    ui.cancel.disabled = false;
     core.flash();
   }
 
@@ -364,7 +389,6 @@ export function initComms(store, { $, params }) {
       if (send && secs >= 0.6 && blob.size > 0) { markSending(); sendVoice(blob, text, secs); } else if (send) flash('too short · hold a little longer', true);
     };
     try { r.mr.state !== 'inactive' ? r.mr.stop() : r.mr.onstop(); } catch { r.mr.onstop(); }
-    ui.cancel.disabled = true;
   }
 
   // The core is the button: hold to talk, or tap to start and tap again to send.
@@ -391,7 +415,19 @@ export function initComms(store, { $, params }) {
   ui.core.addEventListener('pointerup', release);
   ui.core.addEventListener('pointercancel', release);
   ui.core.addEventListener('contextmenu', (ev) => ev.preventDefault());
-  ui.cancel.addEventListener('click', () => { stopRec(false); flash('discarded'); });
+  ui.cancel.addEventListener('click', () => {
+    if (rec) { stopRec(false); flash('discarded'); return; }
+    const p = pendingFor(current);
+    if (p) stopTurn(p);
+  });
+  async function stopTurn(entry) {
+    if (store.mode === 'demo') { demoStop.add(entry.id); flash('abort sent'); return; }
+    try {
+      const r = await fetch('/api/comms/stop', { method: 'POST', headers: { 'content-type': 'application/json', ...auth }, body: JSON.stringify({ id: entry.id }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      flash('abort sent to hermes');
+    } catch (e) { flash(`abort failed: ${e.message}`, true); }
+  }
 
   // ------------------------------------------------------------ playback + speech
   const player = new Audio();
@@ -502,6 +538,14 @@ export function initComms(store, { $, params }) {
     ui.caption.classList.toggle('you', you);
     ui.caption.classList.toggle('forming', forming);
     renderCog(now, p);
+    // one button: discard a recording, or abort a turn that is running
+    const mode2 = rec ? 'discard' : p ? 'abort' : 'idle';
+    if (ui.cancel.dataset.mode !== mode2) {
+      ui.cancel.dataset.mode = mode2;
+      ui.cancel.disabled = mode2 === 'idle';
+      ui.cancel.classList.toggle('abort', mode2 === 'abort');
+      ui.cancel.textContent = mode2 === 'abort' ? '■ ABORT' : '✕ DISCARD';
+    }
 
     // readouts
     const a = agentOf(current);
@@ -514,7 +558,7 @@ export function initComms(store, { $, params }) {
   }
 
   // ------------------------------------------------------------ cognition: the steps and the thought stream
-  let cogKey = '', cogFor = null, thoughtShown = 0, thoughtHtml = '', toolsSeen = new Map();
+  let cogKey = '', cogFor = null, thoughtShown = 0, thoughtHtml = '', toolsSeen = new Map(), stepsShown = { id: null, n: 0 };
   function activeTrace(p) {
     if (p?.trace) return { e: p, live: true };
     const last = log().filter((e) => e.from === 'you' && e.to === current && e.trace).pop();
@@ -545,12 +589,18 @@ export function initComms(store, { $, params }) {
     ui.cgSteps.textContent = String(steps.length);
     ui.cgTools.textContent = String(tools.length);
     ui.cgTime.textContent = secs(elapsed);
-    const key = `${e.id}|${steps.length}|${live}`;
+    const key = `${e.id}|${steps.length}|${live}|${steps.map((s) => (s.finished ? 1 : 0)).join('')}`;
     if (key !== cogKey) {
       cogKey = key;
-      ui.cgList.innerHTML = steps.slice(-9).map((s, i, arr) => {
+      const firstNew = stepsShown.id === e.id ? stepsShown.n : (live ? 0 : steps.length);
+      stepsShown = { id: e.id, n: steps.length };
+      const off = Math.max(0, steps.length - 8);
+      ui.cgList.innerHTML = steps.slice(-8).map((s, i, arr) => {
         const isLive = live && i === arr.length - 1;
-        return `<li class="step ${esc(s.kind)}${isLive ? ' live' : ''}"><span class="ic"><span>${STEP_ICON[s.kind] || '·'}</span></span><span class="tx">${esc(s.text)}</span><span class="du">${isLive ? '' : secs((s.end ?? s.at) - s.at)}</span></li>`;
+        const fresh = off + i >= firstNew;
+        const sub = s.error ? `✕ ${s.error}` : s.detail || '';
+        const du = isLive ? '' : s.ms != null ? secs(s.ms) : secs((s.end ?? s.at) - s.at);
+        return `<li class="step k-${esc(s.kind)}${isLive ? ' live' : ''}${s.error ? ' err' : ''}${fresh ? ' fresh' : ''}"><span class="ic"><span>${STEP_ICON[s.kind] || '·'}</span></span><span class="tx">${esc(s.text)}</span><span class="du">${du}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</li>`;
       }).join('');
     }
     if (live && steps.length) {
@@ -573,8 +623,63 @@ export function initComms(store, { $, params }) {
     if (html !== thoughtHtml) { ui.cgThought.innerHTML = `<div>${html}</div>`; thoughtHtml = html; }
   }
 
+  // ------------------------------------------------------------ authorization: Hermes is waiting on you
+  const au = { box: $('auth'), k: $('auth-k'), who: $('auth-who'), title: $('auth-title'), cmd: $('auth-cmd'), choices: $('auth-choices'), answer: $('auth-answer'), input: $('auth-input'), send: $('auth-send'), foot: $('auth-foot') };
+  let authKey = null, authEntry = null;
+  function waitingOnYou() { return log().filter((e) => e.from === 'you' && e.control && PENDING.has(e.status)).pop() || null; }
+  function renderAuth() {
+    const e = waitingOnYou();
+    const key = e ? `${e.id}|${e.control.request_id}|${e.control.execution_generation}` : null;
+    if (key === authKey) return;
+    authKey = key; authEntry = e;
+    if (!e) { au.box.classList.add('hidden'); return; }
+    const c = e.control, ask = c.type === 'clarify';
+    const who = String(agentOf(e.to).label || e.to).toUpperCase();
+    au.box.classList.toggle('ask', ask);
+    au.k.textContent = ask ? '? CLARIFICATION REQUESTED' : '⚠ AUTHORIZATION REQUIRED';
+    au.who.textContent = `${who} · HERMES AGENT${c.tool ? ` · ${String(c.tool).toUpperCase()}` : ''}`;
+    au.title.textContent = c.title || '';
+    au.cmd.textContent = ask ? '' : c.detail || '';
+    const choices = c.choices && c.choices.length ? c.choices : ask ? [] : ['once', 'deny'];
+    au.choices.innerHTML = choices.map((ch) => `<button data-choice="${esc(ch)}" class="${!ask && ch !== 'deny' ? 'go' : ''}">${esc(ask ? String(ch).toUpperCase() : CHOICE_LABEL[ch] || String(ch).toUpperCase())}</button>`).join('');
+    au.answer.classList.toggle('hidden', !ask);
+    au.input.value = '';
+    au.foot.textContent = ask ? `${who} IS WAITING FOR YOUR ANSWER` : `${who} IS PAUSED UNTIL YOU DECIDE · NOTHING RUNS WITHOUT YOUR SAY-SO`;
+    au.box.classList.remove('hidden');
+    lastTouch = Date.now();
+    // say it out loud so it is noticed across the room
+    if (speakReplies && window.speechSynthesis && !rec) {
+      try { const u = new SpeechSynthesisUtterance(ask ? `${who} has a question.` : `${who} needs your authorization.`); const v = voiceFor(e.to); if (v) u.voice = v; speechSynthesis.speak(u); } catch { /* ignore */ }
+    }
+  }
+  async function answerControl(body) {
+    const e = authEntry;
+    if (!e) return;
+    for (const b of au.box.querySelectorAll('button')) b.disabled = true;
+    if (store.mode === 'demo') { demoAnswer.get(e.id)?.(body); }
+    else {
+      try {
+        const r = await fetch('/api/comms/control', { method: 'POST', headers: { 'content-type': 'application/json', ...auth }, body: JSON.stringify({ id: e.id, ...body }) });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      } catch (err) { au.foot.textContent = `NOT SENT · ${String(err.message).toUpperCase()}`; for (const b of au.box.querySelectorAll('button')) b.disabled = false; return; }
+    }
+    au.box.classList.add('hidden');
+    authKey = null;
+  }
+  au.choices.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-choice]');
+    if (!b) return;
+    unlockAudio();
+    if (authEntry?.control?.type === 'clarify') answerControl({ answer: b.dataset.choice });
+    else answerControl({ choice: b.dataset.choice });
+  });
+  const sendAnswer = () => { const v = au.input.value.trim(); if (v) { au.input.blur(); answerControl({ answer: v }); } };
+  au.send.addEventListener('click', sendAnswer);
+  au.input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') sendAnswer(); });
+  store.on('state', renderAuth);
+
   // ------------------------------------------------------------ boot
   ui.hint.textContent = baseHint();
   if (params.get('comms') === '1') setTimeout(() => open(), 500);
-  return { open, close };
+  return { open, close, auth };
 }

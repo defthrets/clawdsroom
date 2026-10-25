@@ -17,6 +17,10 @@ Everything the room shows comes from one JSON document, the **state**, plus a st
 * `POST /api/comms/voice?to=&kind=&text=` → a voice message: the recording as the body (`audio/*`)
 * `POST /api/comms/reply` → `{from, text, audio_url?}` (or an `audio/*` body with `?from=&text=`): an agent answers, spoken on the HUD
 * `GET  /api/comms/audio/<file>` → a stored recording (byte ranges supported)
+* `POST /api/comms/stop` → `{id}`: stop a running turn (and its Hermes run)
+* `POST /api/comms/control` → `{id, choice}` for an approval (`once`, `deny`, ...) or `{id, answer}` for a clarifying question
+* `GET  /api/hermes/overview?agent=clawd` → Hermes Agent's health, capabilities, skills, toolsets, jobs, sessions and models (cached 15s; `&fresh=1`)
+* `POST /api/hermes/jobs/<id>/run|pause|resume?agent=clawd` → control a scheduled job
 
 Defaults live in [`public/js/defaults.js`](../public/js/defaults.js); the server deep-merges
 whatever you send on top of them. Objects merge recursively, arrays and scalars replace,
@@ -68,7 +72,7 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | `starlink.obstructed`, `starlink.fraction_obstructed` (0..1), `starlink.snr_ok`, `starlink.gps_sats`, `starlink.azimuth`, `starlink.elevation`, `starlink.uptime`, `starlink.software`, `starlink.hardware`, `starlink.eth_mbps`, `starlink.alerts[]`, `starlink.updated` | HUD chips and alerts. The HUD calls the dish stale when `updated` is more than 2 minutes old. |
 | `crew.<name>.online`, `crew.<name>.emoji` | The crew photo: bright when home, grey when away. |
 | `weather.condition` (`clear`/`cloudy`/`rain`), `weather.sunrise`, `weather.sunset` | Clouds, rain, and when the sky turns. |
-| `comms.log[]` | The HUD's comms thread, newest last (60 kept): `{id, at, from, to, kind: talk\|note\|reply, text, audio?, status, error?}`. Managed by the server, see `server/comms.js`. |
+| `comms.log[]` | The HUD's comms thread, newest last (60 kept): `{id, at, from, to, kind: talk\|note\|reply, text, audio?, status, error?, trace?, control?, run?}`. `trace` is the turn's steps, reasoning and partial answer; `control` is an approval or question Hermes is waiting on. Managed by the server, see `server/comms.js`. |
 | `settings.sleep_after_min`, `settings.reload_hours` | Auto-sleep; the page reloads itself every N hours (24). |
 
 ## Events

@@ -31,7 +31,10 @@
         <div class="now-v" id="now">Clawd is settling in…</div>
       </div>
       <div class="alerts" id="alerts"></div>
+      <div class="top-btns">
+        <button class="comms-btn sys-btn" id="sys-btn" aria-label="Hermes systems"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2"/></svg>HERMES</button>
       <button class="comms-btn" id="comms-btn" aria-label="talk to the agents"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>COMMS<span class="badge hidden" id="comms-badge"></span></button>
+      </div>
       <div class="clock">
         <div class="clock-t" id="clock">--:--<span id="secs">:--</span></div>
         <div class="clock-d" id="date">---</div>
@@ -168,6 +171,72 @@
         </aside>
       </div>
     </section>
+
+    <!-- Hermes Agent: the system around Clawd -->
+    <section class="comms sys hidden" id="sys" role="dialog" aria-label="Hermes systems">
+      <div class="nl-frame"></div>
+      <header class="nl-top">
+        <div class="nl-title"><span class="nl-glyph">⬢</span>HERMES <b>//</b> SYSTEMS</div>
+        <div class="nl-chips"><span class="nl-chip" id="sys-at">SYNC —</span><span class="nl-chip bad-t" id="sys-err"></span></div>
+        <button class="nl-side sys-refresh" id="sys-refresh">⟳ RESYNC</button>
+        <button class="nl-close" id="sys-close" aria-label="close"><span>✕</span></button>
+      </header>
+      <div class="sys-body">
+        <div class="sys-col">
+          <div class="sys-card sys-core">
+            <div class="sys-k">AGENT CORE</div>
+            <div class="sys-orb" id="sys-status"><i></i><i></i><i></i><b id="sys-status-t">—</b></div>
+            <dl class="sys-dl">
+              <div><dt>PLATFORM</dt><dd id="sys-platform">—</dd></div>
+              <div><dt>MODEL</dt><dd id="sys-model">—</dd></div>
+              <div><dt>ACTIVE RUNS</dt><dd id="sys-runs">0</dd></div>
+            </dl>
+          </div>
+          <div class="sys-card grow">
+            <div class="sys-k">READINESS</div>
+            <ul class="sys-checks" id="sys-checks"></ul>
+            <div class="sys-k">CAPABILITIES</div>
+            <div class="sys-caps" id="sys-caps"></div>
+            <div class="sys-k">PROVIDERS</div>
+            <div class="sys-caps" id="sys-providers"></div>
+          </div>
+        </div>
+        <div class="sys-col">
+          <div class="sys-card grow">
+            <div class="sys-k">SKILL MATRIX <em id="sys-skill-n">0</em></div>
+            <div class="hexes" id="sys-skills"></div>
+          </div>
+          <div class="sys-card">
+            <div class="sys-k">TOOLSETS <em id="sys-tool-n">0</em></div>
+            <div class="toolsets" id="sys-toolsets"></div>
+          </div>
+        </div>
+        <div class="sys-col">
+          <div class="sys-card">
+            <div class="sys-k">SCHEDULE · CRON <em id="sys-job-n">0</em></div>
+            <div class="jobs" id="sys-jobs"></div>
+          </div>
+          <div class="sys-card grow">
+            <div class="sys-k">SESSIONS</div>
+            <div class="sessions" id="sys-sessions"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hermes is waiting on you: approve a command, or answer a question -->
+    <div class="auth hidden" id="auth" role="alertdialog" aria-label="Authorization required">
+      <div class="auth-box">
+        <div class="auth-hazard"></div>
+        <div class="auth-k" id="auth-k">⚠ AUTHORIZATION REQUIRED</div>
+        <div class="auth-who" id="auth-who">CLAWD · HERMES AGENT</div>
+        <div class="auth-title" id="auth-title"></div>
+        <pre class="auth-cmd" id="auth-cmd"></pre>
+        <div class="auth-choices" id="auth-choices"></div>
+        <div class="auth-answer hidden" id="auth-answer"><span>&gt;</span><input id="auth-input" type="text" placeholder="your answer…" autocomplete="off" enterkeyhint="send"><button id="auth-send">ANSWER</button></div>
+        <div class="auth-foot" id="auth-foot"></div>
+      </div>
+    </div>
 
     <div class="scan" aria-hidden="true"></div>
 
