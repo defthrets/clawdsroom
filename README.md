@@ -105,6 +105,8 @@ cameras, just the numbers, laid out for an iPad mini in landscape.
   cron, LAN/WAN, and a live event log. Problems (watchdog alerts, Starlink offline or obstructed,
   low battery, WAN down) show as alerts at the top.
 
+**ROOM** in the HUD's top bar takes you to Clawd's Room, and **HUD ▸** in the room's top bar brings you back.
+
 Add it to the home screen the same way as the room: it has its own manifest, so it opens
 straight to the HUD as **Clawd HUD**. `?demo=1` shows it with simulated data.
 

@@ -579,6 +579,8 @@ html, body {
 
 /* ---------------------------------------------------------------- hermes // systems */
 .top-btns { display: flex; gap: 8px; }
+.room-btn { text-decoration: none; color: #fbbf77; border-color: rgba(251, 191, 119, 0.6); background: rgba(251, 146, 60, 0.08); text-shadow: 0 0 8px rgba(251, 146, 60, 0.6); }
+.room-btn:active { background: #fb923c; color: var(--bg); }
 .sys-btn.on { background: #a78bfa; color: var(--bg); border-color: #a78bfa; }
 .sys-btn { color: #c4b5fd; border-color: rgba(167, 139, 250, 0.7); background: rgba(139, 92, 246, 0.1); text-shadow: 0 0 8px rgba(139, 92, 246, 0.7); }
 .sys { --acc: #a78bfa; }

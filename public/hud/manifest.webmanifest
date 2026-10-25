@@ -2,7 +2,7 @@
   "name": "Clawd HUD",
   "short_name": "Clawd HUD",
   "start_url": "/hud/",
-  "scope": "/hud/",
+  "scope": "/",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#02050b",
