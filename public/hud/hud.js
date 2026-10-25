@@ -4,8 +4,6 @@
 import { Store } from '/js/state.js';
 import { connect } from '/js/net.js';
 import { fmtUptime, fmtAgo, clamp } from '/js/util.js';
-import { initComms } from '/hud/comms.js';
-import { initSystems } from '/hud/systems.js';
 
 const STAGE_W = 1133, STAGE_H = 744;
 const STALE_MS = 120000;           // Starlink counts as stale after 2 minutes without a push
@@ -708,8 +706,11 @@ connect(store, {
   },
 });
 
-const comms = initComms(store, { $, params });
-const systems = initSystems(store, { $, auth: comms.auth });
+// COMMS and HERMES load on their own: if either fails on this device, the rest of the HUD still runs.
+let comms = null, systems = null;
+import('/hud/comms.js')
+  .then(({ initComms }) => { comms = initComms(store, { $, params }); window.hud.comms = comms; return import('/hud/systems.js').then(({ initSystems }) => { systems = initSystems(store, { $, auth: comms.auth }); window.hud.systems = systems; }); })
+  .catch((e) => { console.error(e); if (window.hudError) window.hudError(`COMMS/HERMES did not load: ${e && e.message ? e.message : e}`); });
 
 resize();
 tickClock();
@@ -752,4 +753,4 @@ setInterval(() => {
   if (hours > 0 && performance.now() > hours * 3600 * 1000) location.reload();
 }, 60000);
 
-window.hud = { store, live, comms, systems };
+window.hud = { store, live, comms, systems, ok: true };

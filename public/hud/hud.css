@@ -693,6 +693,12 @@ html, body {
 .auth-answer button { align-self: stretch; font: inherit; font-size: 11px; font-weight: 800; letter-spacing: 0.22em; color: #120d00; background: var(--warn); border: 0; padding: 0 18px; cursor: pointer; }
 .auth-foot { margin-top: 14px; font-size: 9px; letter-spacing: 0.22em; color: var(--dim); }
 
+/* ---------------------------------------------------------------- diagnostics (only when something is wrong) */
+.diag { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 100; max-width: 90vw; padding: 10px 14px; font: 12px/1.5 ui-monospace, Menlo, monospace; color: #fff; background: rgba(120, 10, 30, 0.95); border: 1px solid #f43f5e; box-shadow: 0 0 30px rgba(244, 63, 94, 0.5); }
+.diag b { letter-spacing: 0.2em; }
+.diag small { color: #fecdd3; }
+.diag.hidden { display: none; }
+
 /* ---------------------------------------------------------------- boot sequence */
 .boot {
   position: absolute; inset: 0; z-index: 20; pointer-events: none;

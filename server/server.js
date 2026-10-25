@@ -228,10 +228,16 @@ async function serveStatic(req, res, pathname) {
   try { stat = await fsp.stat(file); } catch { return send(res, 404, 'not found'); }
   if (stat.isDirectory()) return serveStatic(req, res, path.posix.join(rel, 'index.html'));
   const ext = path.extname(file).toLowerCase();
+  // Code is revalidated on every load (cheap 304s), so an update never leaves the iPad running a mix of old
+  // and new modules, which stops the whole page. Images can be cached.
+  const etag = `"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+  const code = ['.html', '.js', '.mjs', '.css', '.json', '.webmanifest'].includes(ext);
+  const headers = { ETag: etag, 'Last-Modified': stat.mtime.toUTCString(), 'Cache-Control': code ? 'no-cache' : 'max-age=86400' };
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
   res.writeHead(200, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Content-Length': stat.size,
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'max-age=300',
+    ...headers,
   });
   if (req.method === 'HEAD') return res.end();
   fs.createReadStream(file).pipe(res);

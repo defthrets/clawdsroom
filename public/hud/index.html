@@ -276,6 +276,30 @@
       </div>
     </div>
   </div>
+  <div class="diag hidden" id="diag" role="alert"></div>
+  <script>
+    // Shows on the wall what went wrong if the HUD can't start (old Safari, a missing file, a script error).
+    (function () {
+      var box = document.getElementById('diag'), lines = [];
+      function show(msg) {
+        if (lines.indexOf(msg) < 0) lines.push(msg);
+        box.innerHTML = '<b>HUD DIAGNOSTIC</b><br>' + lines.slice(-6).map(function (l) { return String(l).replace(/[<>&]/g, ''); }).join('<br>') +
+          '<br><small>' + navigator.userAgent.replace(/[<>&]/g, '') + '</small><br><small>tap to hide</small>';
+        box.className = 'diag';
+      }
+      window.hudError = show;
+      box.addEventListener('click', function () { box.className = 'diag hidden'; });
+      window.addEventListener('error', function (e) {
+        if (e && e.target && e.target !== window && (e.target.src || e.target.href)) { show('could not load ' + (e.target.src || e.target.href)); return; }
+        show((e.message || 'script error') + (e.filename ? ' @ ' + e.filename.replace(location.origin, '') + ':' + e.lineno : ''));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) { show('unhandled: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+      setTimeout(function () {
+        if (!(window.hud && window.hud.ok)) show('the HUD script did not start after 8s. If this Safari is older than iOS 14, update iPadOS; otherwise send this box to Claude.');
+      }, 8000);
+    })();
+  </script>
+  <script nomodule>document.getElementById('diag').className = 'diag'; document.getElementById('diag').innerHTML = '<b>HUD DIAGNOSTIC</b><br>This browser does not support JavaScript modules. Update iPadOS (Settings, General, Software Update).';</script>
   <script type="module" src="/hud/hud.js"></script>
 </body>
 </html>
