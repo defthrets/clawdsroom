@@ -76,23 +76,46 @@
         </div>
       </section>
 
-      <!-- centre: the dish -->
-      <section class="panel uplink">
-        <h2><i></i>UPLINK <b>// STARLINK</b><em id="sl-state">—</em></h2>
-        <div class="sky-wrap">
-          <canvas id="c-sky"></canvas>
-          <div class="sky-hud tl"><span>DOWN</span><b id="sl-down">—</b></div>
-          <div class="sky-hud tr"><span>UP</span><b id="sl-up">—</b></div>
-          <div class="sky-hud bl"><span>PING</span><b id="sl-ping">—</b></div>
-          <div class="sky-hud br"><span>DROP</span><b id="sl-drop">—</b></div>
-          <div class="sky-off hidden" id="sl-off">NO SIGNAL</div>
-        </div>
-        <div class="chips" id="sl-chips"></div>
-        <div class="chart-head"><span>THROUGHPUT <em id="tp-unit">Mb/s</em></span><span class="legend"><i class="sw c-down"></i>DOWN <i class="sw c-up"></i>UP<button class="range" id="range">LIVE</button></span></div>
-        <canvas id="c-tp" class="chart tall"></canvas>
-        <div class="chart-head"><span>LATENCY <em>ms</em></span><span class="legend"><i class="sw c-ms"></i>PING <i class="sw c-drop"></i>DROPS</span></div>
-        <canvas id="c-ms" class="chart"></canvas>
-      </section>
+      <!-- centre: Clawd himself, hold to talk; the dish underneath -->
+      <div class="center">
+        <section class="panel clawd-panel" id="clawd-panel" data-state="idle">
+          <h2><i></i>CLAWD <b>// NEURAL LINK</b><em id="hud-link">—</em><button class="hud-expand" id="hud-expand" aria-label="open the full neural link">⤢ LINK</button></h2>
+          <div class="hud-core-wrap">
+            <canvas id="hud-core" aria-label="hold to talk to Clawd"></canvas>
+            <div class="hud-step" id="hud-step"></div>
+            <div class="hud-mode">
+              <button class="sel" data-mode="talk">TALK</button>
+              <button data-mode="note">NOTE</button>
+            </div>
+            <div class="hud-tip" id="hud-tip">HOLD TO TALK</div>
+          </div>
+          <div class="hud-state" id="hud-state">STANDBY</div>
+          <div class="hud-caption" id="hud-caption"></div>
+        </section>
+
+        <section class="panel uplink compact">
+          <h2><i></i>UPLINK <b>// STARLINK</b><em id="sl-state">—</em></h2>
+          <div class="sky-wrap">
+            <canvas id="c-sky"></canvas>
+            <div class="sky-hud tl"><span>DOWN</span><b id="sl-down">—</b></div>
+            <div class="sky-hud tr"><span>UP</span><b id="sl-up">—</b></div>
+            <div class="sky-hud bl"><span>PING</span><b id="sl-ping">—</b></div>
+            <div class="sky-hud br"><span>DROP</span><b id="sl-drop">—</b></div>
+            <div class="sky-off hidden" id="sl-off">NO SIGNAL</div>
+          </div>
+          <div class="chips" id="sl-chips"></div>
+          <div class="charts2">
+            <div class="ch">
+              <div class="chart-head"><span>THROUGHPUT <em id="tp-unit">Mb/s</em></span><span class="legend"><i class="sw c-down"></i>DN <i class="sw c-up"></i>UP<button class="range" id="range">LIVE</button></span></div>
+              <canvas id="c-tp" class="chart"></canvas>
+            </div>
+            <div class="ch">
+              <div class="chart-head"><span>LATENCY <em>ms</em></span><span class="legend"><i class="sw c-ms"></i>PING <i class="sw c-drop"></i>DROP</span></div>
+              <canvas id="c-ms" class="chart"></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <!-- right: who we're talking to -->
       <section class="panel net">

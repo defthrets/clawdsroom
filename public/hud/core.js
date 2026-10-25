@@ -1,6 +1,8 @@
 // The comms "core": a holographic particle sphere with rings, drawn on a canvas. It is the talk
 // button, and it shows the state of the link: standby, listening, sending, thinking, speaking.
 
+import { CLAWD_BODY, CLAW } from '/js/sprites.js';
+
 const TAU = Math.PI * 2;
 const PALETTE = {
   idle:      { core: [34, 229, 255], hot: [190, 250, 255] },
@@ -17,7 +19,9 @@ const mixc = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t)));
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
 export class Core {
-  constructor(canvas) {
+  // opts: rScale (core size against the canvas), ringText (the lettering around it), holo (Clawd inside)
+  constructor(canvas, { rScale = 0.245, ringText = true, holo = true, holoScale = 1.1 } = {}) {
+    this.opts = { rScale, ringText, holo, holoScale };
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
     this.state = 'idle';
@@ -39,6 +43,7 @@ export class Core {
     });
     this.sats = Array.from({ length: 3 }, (_, i) => ({ a: (i / 3) * TAU, tilt: 0.35 + i * 0.5, sp: 0.9 + i * 0.35 }));
     this.nodes = []; // tool calls launched onto an orbit: {label, born, a}
+    this.blinkAt = 3; this.glitchAt = 4; this.glitch = 0;
   }
 
   // A tool Clawd is using: it launches out of the core and orbits with its name for a while.
@@ -106,7 +111,7 @@ export class Core {
 
     ctx.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2;
-    const R = (this.R = Math.min(w, h) * 0.245 * (0.6 + 0.4 * boot));
+    const R = (this.R = Math.min(w, h) * this.opts.rScale * (0.6 + 0.4 * boot));
 
     // halo
     const halo = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 2.3);
@@ -133,6 +138,7 @@ export class Core {
     ctx.restore();
 
     // text running around the outside
+    if (this.opts.ringText) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.globalAlpha = 0.55 * boot;
@@ -149,6 +155,7 @@ export class Core {
       ctx.restore();
     }
     ctx.restore();
+    }
 
     // three counter-rotating arcs
     ctx.save();
@@ -203,8 +210,8 @@ export class Core {
     proj.sort((a, b) => b[2] - a[2]);
     for (const [x, y, z] of proj) {
       const d = (1 - z) / 2; // 0 back .. 1 front
-      ctx.fillStyle = rgba(d > 0.75 ? hot : col, 0.15 + d * 0.85);
-      const s = 0.8 + d * 1.8;
+      ctx.fillStyle = rgba(d > 0.75 ? hot : col, (0.15 + d * 0.85) * (this.opts.holo ? 0.6 : 1));
+      const s = (0.8 + d * 1.8) * (this.opts.holo ? 0.85 : 1);
       ctx.fillRect(x - s / 2, y - s / 2, s, s);
     }
 
@@ -259,11 +266,20 @@ export class Core {
 
     // inner core glow
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * (0.55 + L * 0.5));
-    g.addColorStop(0, rgba(hot, 0.65 + L * 0.35));
+    g.addColorStop(0, rgba(hot, (this.opts.holo ? 0.3 : 0.65) + L * 0.35));
     g.addColorStop(0.35, rgba(col, 0.25 + L * 0.3));
     g.addColorStop(1, rgba(col, 0));
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(cx, cy, R * (0.55 + L * 0.5), 0, TAU); ctx.fill();
+
+    if (this.opts.holo) {
+      // a dark well behind him so the hologram reads against the sphere
+      const well = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.95);
+      well.addColorStop(0, 'rgba(1, 6, 12, 0.78)'); well.addColorStop(0.7, 'rgba(1, 6, 12, 0.5)'); well.addColorStop(1, 'rgba(1, 6, 12, 0)');
+      ctx.fillStyle = well;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.95, 0, TAU); ctx.fill();
+      this.hologram(ctx, cx, cy, R, dt, boot);
+    }
 
     // targeting brackets
     ctx.strokeStyle = rgba(col, 0.6 * boot); ctx.lineWidth = 1.5;
@@ -272,5 +288,109 @@ export class Core {
       const x = cx + sx * B, y = cy + sy * B * 0.62;
       ctx.beginPath(); ctx.moveTo(x, y - sy * l); ctx.lineTo(x, y); ctx.lineTo(x - sx * l, y); ctx.stroke();
     }
+  }
+
+  // Clawd himself as a hologram inside the core: his room sprite, voxel by voxel, scanlined and flickering,
+  // standing on a projector beam. His eyes and mouth follow the link: wide while listening, darting while
+  // thinking, talking while he answers, crossed out when the link is down.
+  hologram(ctx, cx, cy, R, dt, boot) {
+    const t = this.t, st = this.state, L = this.level, col = this.col, hot = this.hot;
+    const rows = CLAWD_BODY.rows, H = rows.length, W = rows[0].length;
+    const px = (R * this.opts.holoScale) / H;
+    const bob = Math.sin(t * 1.7) * px * 0.5;
+    const x0 = cx - (W / 2) * px, y0 = cy - (H / 2) * px - px * 0.6 + bob;
+    // blink and glitch timers
+    if (t > this.blinkAt + 0.14) this.blinkAt = t + 2.5 + Math.random() * 3;
+    const blinking = t > this.blinkAt && t < this.blinkAt + 0.14;
+    if (t > this.glitchAt) { this.glitch = 0.16; this.glitchAt = t + 3 + Math.random() * 5; }
+    this.glitch = Math.max(0, this.glitch - dt);
+    const glitching = this.glitch > 0 || this.burst > 0.5;
+
+    ctx.save();
+    ctx.globalAlpha = boot * (0.82 + 0.18 * Math.sin(t * 23) * Math.sin(t * 7));
+    // projector: a glowing pad under his feet and a cone of light up through him
+    const fy = y0 + H * px + px * 0.8;
+    const cone = ctx.createLinearGradient(0, fy, 0, y0 - px * 2);
+    cone.addColorStop(0, rgba(col, 0.32)); cone.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = cone;
+    ctx.beginPath(); ctx.moveTo(cx - W * px * 0.28, fy); ctx.lineTo(cx + W * px * 0.28, fy); ctx.lineTo(cx + W * px * 0.62, y0 - px * 2); ctx.lineTo(cx - W * px * 0.62, y0 - px * 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = rgba(hot, 0.7); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(cx, fy, W * px * 0.34, px * 0.9, 0, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = rgba(col, 0.4);
+    ctx.beginPath(); ctx.ellipse(cx, fy, W * px * 0.46 + Math.sin(t * 3) * px, px * 1.3, 0, 0, TAU); ctx.stroke();
+
+    // body voxels
+    ctx.globalCompositeOperation = 'lighter';
+    const scanY = (t * 0.6) % 1.4 - 0.2; // a bright band sweeping down through him
+    for (let r = 0; r < H; r++) {
+      const shift = glitching && (r * 7 + Math.floor(t * 30)) % 5 === 0 ? (Math.random() - 0.5) * px * 3 : 0;
+      const band = Math.max(0, 1 - Math.abs(r / H - scanY) * 6);
+      for (let c = 0; c < W; c++) {
+        const ch = rows[r][c];
+        if (ch === '.') continue;
+        const base = ch === 'p' ? hot : col;
+        const a = (ch === 'p' ? 0.78 : 0.55) + band * 0.35;
+        ctx.fillStyle = rgba(base, a);
+        ctx.fillRect(x0 + c * px + shift, y0 + r * px, px - 0.7, px * 0.7);
+      }
+    }
+    // claws, raised while he listens
+    const up = st === 'listening' || st === 'note' ? -px * 2.2 : st === 'speaking' ? -px * (0.6 + Math.sin(t * 8) * 0.6) : 0;
+    for (const [side, cxw] of [[-1, x0 - px * 2.2], [1, x0 + W * px - px * 0.8]]) {
+      CLAW.rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] === '.') continue;
+          const cc = side < 0 ? row.length - 1 - c : c;
+          ctx.fillStyle = rgba(hot, 0.5);
+          ctx.fillRect(cxw + cc * px, y0 + (8 + r) * px + up, px - 0.7, px * 0.7);
+        }
+      });
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // face: drawn dark, so it reads against the glow
+    const dark = 'rgba(2, 10, 20, 0.92)';
+    const ex = [4, 10];
+    const look = st === 'thinking' ? Math.round(Math.sin(t * 2.4)) : 0;
+    if (st === 'offline') {
+      ctx.strokeStyle = 'rgba(255,90,110,0.95)'; ctx.lineWidth = Math.max(1.5, px * 0.35);
+      for (const e of ex) {
+        const x = x0 + e * px, y = y0 + 6 * px;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + px * 2, y + px * 2); ctx.moveTo(x + px * 2, y); ctx.lineTo(x, y + px * 2); ctx.stroke();
+      }
+    } else if (blinking) {
+      ctx.fillStyle = dark;
+      for (const e of ex) ctx.fillRect(x0 + e * px, y0 + 7 * px, px * 2, px * 0.5);
+    } else {
+      const wide = st === 'listening' || st === 'note';
+      for (const e of ex) {
+        ctx.fillStyle = dark;
+        if (wide) ctx.fillRect(x0 + (e - 0.5) * px, y0 + 5 * px, px * 3, px * 3);
+        else ctx.fillRect(x0 + e * px, y0 + 6 * px, px * 2, px * 2);
+        // the pupil glints in the core colour
+        ctx.fillStyle = rgba(hot, 1);
+        const gx = x0 + (e + (wide ? 0.6 : 0.5) + look * 0.5) * px, gy = y0 + (wide ? 5.7 : 6.3) * px;
+        ctx.fillRect(gx, gy, px * 0.8, px * 0.8);
+      }
+    }
+    // mouth: a line at rest, open and moving while he talks or writes
+    ctx.fillStyle = dark;
+    const talking = st === 'speaking' || st === 'composing';
+    const open = talking ? Math.max(0.4, L * 4.2) : st === 'listening' || st === 'note' ? 0.5 : 0.45;
+    ctx.fillRect(x0 + 6 * px, y0 + 9.2 * px, px * 4, px * Math.min(2.6, open));
+    if (st === 'thinking') { // a little loading bar across his chest
+      const w = px * 6, x = x0 + 5 * px, y = y0 + 12 * px;
+      ctx.fillStyle = 'rgba(2,10,20,0.7)'; ctx.fillRect(x, y, w, px * 0.6);
+      ctx.fillStyle = rgba(hot, 1); ctx.fillRect(x + ((t * 0.8) % 1) * (w - px * 1.5), y, px * 1.5, px * 0.6);
+    }
+    // antenna tips pulse
+    ctx.globalCompositeOperation = 'lighter';
+    for (const c of [4, 11]) {
+      const g = ctx.createRadialGradient(x0 + c * px + px / 2, y0 + px / 2, 0, x0 + c * px + px / 2, y0 + px / 2, px * (1.6 + L * 3));
+      g.addColorStop(0, rgba(hot, 0.9)); g.addColorStop(1, rgba(hot, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x0 + c * px - px * 4, y0 - px * 4, px * 9, px * 9);
+    }
+    ctx.restore();
   }
 }

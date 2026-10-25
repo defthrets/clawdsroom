@@ -35,13 +35,21 @@ export function initComms(store, { $, params }) {
     cgList: $('cg-list'), cgThought: $('cg-thought'), cgChars: $('cg-chars'),
   };
   const core = new Core(ui.core);
+  // the big Clawd on the main HUD: the same link, always on screen
+  const hud = {
+    core: new Core($('hud-core'), { rScale: 0.27, ringText: true, holoScale: 1.6 }), panel: $('clawd-panel'),
+    state: $('hud-state'), caption: $('hud-caption'), step: $('hud-step'), link: $('hud-link'), tip: $('hud-tip'),
+  };
+  const cores = [core, hud.core];
+  const flashAll = () => cores.forEach((c) => c.flash());
+  const pulseAll = (v) => cores.forEach((c) => c.pulse(v));
   let agents = [{ id: 'clawd', label: 'Clawd', ready: false }];
   let current = 'clawd';
   let mode = 'talk';
   let speakReplies = true;
   try { speakReplies = localStorage.getItem('clawdhud.speak') !== '0'; } catch { /* ignore */ }
   let lastTouch = 0, openedAt = 0, bootUntil = 0, sendFlashAt = 0;
-  const markSending = () => { sendFlashAt = performance.now(); core.flash(); };
+  const markSending = () => { sendFlashAt = performance.now(); cores.forEach((c) => c.flash()); };
   const seen = new Set();
   let seeded = false;
 
@@ -58,7 +66,7 @@ export function initComms(store, { $, params }) {
     panel.classList.remove('hidden');
     btn.classList.add('on');
     lastTouch = Date.now();
-    if (!was) { openedAt = performance.now(); bootUntil = openedAt + 1100; core.powerUp(); requestAnimationFrame(loop); }
+    if (!was) { openedAt = performance.now(); bootUntil = openedAt + 1100; core.powerUp(); }
     loadAgents();
     render(true);
   }
@@ -69,6 +77,7 @@ export function initComms(store, { $, params }) {
   }
   btn.addEventListener('click', () => { unlockAudio(); isOpen() ? close() : open(); });
   $('cm-close').addEventListener('click', close);
+  $('hud-expand').addEventListener('click', () => { unlockAudio(); open(); });
   panel.addEventListener('pointerdown', () => { lastTouch = Date.now(); unlockAudio(); });
   setInterval(() => {
     if (isOpen() && !rec && !speaking() && !pendingFor(current) && Date.now() - lastTouch > AUTO_CLOSE_MS) close();
@@ -84,7 +93,9 @@ export function initComms(store, { $, params }) {
     if (!agents.some((a) => a.id === current)) current = agents[0]?.id;
     renderAgents();
   }
-  setInterval(() => { if (isOpen()) loadAgents(); }, 30000);
+  setInterval(loadAgents, 30000); // the main HUD shows the link too, so keep it fresh
+  setTimeout(loadAgents, 1500);
+  setTimeout(loadAgents, 6000); // demo mode starts after a few seconds
 
   const pendingFor = (id) => log().find((e) => e.from === 'you' && e.to === id && PENDING.has(e.status));
   const linkName = (a) => (a.type === 'hermes' ? 'HERMES AGENT' : String(a.type || 'NO LINK').toUpperCase());
@@ -103,7 +114,7 @@ export function initComms(store, { $, params }) {
     const b = ev.target.closest('.agent');
     if (!b || b.dataset.id === current) return;
     current = b.dataset.id;
-    core.flash();
+    flashAll();
     renderAgents(); render(true);
   });
 
@@ -126,10 +137,10 @@ export function initComms(store, { $, params }) {
   }
 
   // ------------------------------------------------------------ mode + voice toggles
-  for (const b of document.querySelectorAll('.nl-mode button')) {
+  for (const b of document.querySelectorAll('.nl-mode button, .hud-mode button')) {
     b.addEventListener('click', () => {
       mode = b.dataset.mode;
-      for (const o of document.querySelectorAll('.nl-mode button')) o.classList.toggle('sel', o === b);
+      for (const o of document.querySelectorAll('.nl-mode button, .hud-mode button')) o.classList.toggle('sel', o.dataset.mode === mode);
       flash(mode === 'note' ? 'voice note: hold the core to record a message' : 'talk: hold the core and speak');
     });
   }
@@ -216,9 +227,9 @@ export function initComms(store, { $, params }) {
       if (seen.has(e.id)) continue;
       seen.add(e.id);
       if (e.kind === 'reply') {
-        if (!isOpen()) open(e.from); else if (!rec) current = e.from;
+        if (isOpen() && !rec) current = e.from; // the main HUD shows it too, so the link doesn't take over the screen
         lastTouch = Date.now();
-        core.flash();
+        flashAll();
         if (speakReplies && !rec) say(e); else lastReply = { text: e.text, lit: e.text.length };
       }
     }
@@ -372,7 +383,7 @@ export function initComms(store, { $, params }) {
         r.sr = sr;
       } catch { /* not allowed here */ }
     }
-    core.flash();
+    flashAll();
   }
 
   function stopRec(send) {
@@ -391,30 +402,35 @@ export function initComms(store, { $, params }) {
     try { r.mr.state !== 'inactive' ? r.mr.stop() : r.mr.onstop(); } catch { r.mr.onstop(); }
   }
 
-  // The core is the button: hold to talk, or tap to start and tap again to send.
+  // Either core is the button: hold to talk, or tap to start and tap again to send.
   let downAt = 0, early = null; // early: how long it was held if released before the mic was ready
-  ui.core.addEventListener('pointerdown', async (ev) => {
-    const box = ui.core.getBoundingClientRect();
-    const k = box.width / ui.core.clientWidth; // the stage is scaled
-    if (!core.hit((ev.clientX - box.left) / k, (ev.clientY - box.top) / k)) return;
-    ev.preventDefault();
-    unlockAudio();
-    if (rec) { stopRec(true); downAt = 0; return; }
-    downAt = performance.now();
-    early = null;
-    await startRec();
-    if (rec && early != null && early > HOLD_MS) stopRec(true);
-  });
-  const release = () => {
-    if (!downAt) return;
-    const held = performance.now() - downAt;
-    downAt = 0;
-    if (!rec) { early = held; return; }
-    if (held > HOLD_MS) stopRec(true); // a hold sends on release; a tap leaves it recording
-  };
-  ui.core.addEventListener('pointerup', release);
-  ui.core.addEventListener('pointercancel', release);
-  ui.core.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  function bindTalk(canvas, c) {
+    canvas.addEventListener('pointerdown', async (ev) => {
+      const box = canvas.getBoundingClientRect();
+      const k = box.width / canvas.clientWidth; // the stage is scaled
+      if (!c.hit((ev.clientX - box.left) / k, (ev.clientY - box.top) / k)) return;
+      ev.preventDefault();
+      unlockAudio();
+      lastTouch = Date.now();
+      if (rec) { stopRec(true); downAt = 0; return; }
+      downAt = performance.now();
+      early = null;
+      await startRec();
+      if (rec && early != null && early > HOLD_MS) stopRec(true);
+    });
+    const release = () => {
+      if (!downAt) return;
+      const held = performance.now() - downAt;
+      downAt = 0;
+      if (!rec) { early = held; return; }
+      if (held > HOLD_MS) stopRec(true); // a hold sends on release; a tap leaves it recording
+    };
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  }
+  bindTalk(ui.core, core);
+  bindTalk($('hud-core'), hud.core);
   ui.cancel.addEventListener('click', () => {
     if (rec) { stopRec(false); flash('discarded'); return; }
     const p = pendingFor(current);
@@ -454,7 +470,7 @@ export function initComms(store, { $, params }) {
     speakStart = performance.now();
     lastReply = text ? { text, lit: 0 } : lastReply;
     player.src = src;
-    player.ontimeupdate = () => { if (lastReply && text && player.duration) lastReply.lit = Math.floor(text.length * (player.currentTime / player.duration)); core.pulse(0.5); };
+    player.ontimeupdate = () => { if (lastReply && text && player.duration) lastReply.lit = Math.floor(text.length * (player.currentTime / player.duration)); pulseAll(0.5); };
     player.onended = player.onerror = () => { speakingAgent = null; if (lastReply) lastReply.lit = lastReply.text.length; renderAgents(); };
     player.play().catch(() => { speakingAgent = null; });
     renderAgents();
@@ -484,7 +500,7 @@ export function initComms(store, { $, params }) {
     u.onboundary = (b) => {
       const end = spoken.indexOf(' ', b.charIndex + 1);
       lastReply.lit = end < 0 ? spoken.length : end;
-      core.pulse(0.55 + Math.random() * 0.3);
+      pulseAll(0.55 + Math.random() * 0.3);
     };
     u.onend = u.onerror = () => { speakingAgent = null; lastReply.lit = lastReply.text.length; renderAgents(); };
     speechSynthesis.speak(u);
@@ -505,35 +521,39 @@ export function initComms(store, { $, params }) {
 
   const LABEL = { idle: 'STANDBY', listening: 'LISTENING', note: 'RECORDING', sending: 'TRANSMITTING', thinking: 'PROCESSING', composing: 'COMPOSING', speaking: 'RESPONDING', offline: 'LINK DOWN' };
   let lastFrame = 0, lastText = '';
+  let hudText = '', hudCap = '', hudStep = '';
   function loop(now) {
-    if (!isOpen()) return;
     requestAnimationFrame(loop);
-    if (now - lastFrame < 1000 / 40) return;
+    if (document.hidden || now - lastFrame < 1000 / 40) return;
     const dt = Math.min(0.1, (now - (lastFrame || now)) / 1000);
     lastFrame = now;
-    core.scale = parseFloat(getComputedStyle(document.getElementById('stage')).getPropertyValue('--k')) || 1;
+    const k = parseFloat(getComputedStyle(document.getElementById('stage')).getPropertyValue('--k')) || 1;
+    const p = pendingFor(current);
+    // tools launch out of both cores as they start
+    if (p?.trace) {
+      const tools = (p.trace.steps || []).filter((x) => x.kind === 'tool');
+      const seenN = toolsSeen.get(p.id) ?? 0;
+      for (const x of tools.slice(seenN)) cores.forEach((c) => c.addNode(x.text));
+      toolsSeen.set(p.id, tools.length);
+      if (toolsSeen.size > 20) toolsSeen.delete(toolsSeen.keys().next().value);
+    }
+    if (rec && rec.analyser) { rec.analyser.getByteFrequencyData(rec.bytes); cores.forEach((c) => c.feed(rec.bytes)); }
+    if (!isOpen()) { renderHud(now, dt, k, p); return; }
+    core.scale = k;
     const booting = now < bootUntil;
     const st = booting ? 'sending' : coreState();
     core.set(st);
-    if (rec && rec.analyser) { rec.analyser.getByteFrequencyData(rec.bytes); core.feed(rec.bytes); }
     core.frame(dt);
     panel.dataset.state = st;
 
     // state label, with what Clawd is doing while he thinks
-    const p = pendingFor(current);
     const label = booting ? 'LINKING' : LABEL[st];
     const sub = st === 'thinking' && p?.progress ? `⚙ ${String(p.progress).toUpperCase()}` : st === 'offline' ? 'HERMES AGENT IS NOT ANSWERING' : '';
     const html = `${label}${sub ? `<small>${esc(sub)}</small>` : ''}`;
     if (html !== lastText) { ui.state.innerHTML = html; lastText = html; }
 
     // caption: your words while you talk, his words (lit as spoken) while he answers
-    let cap = '', you = false, forming = false;
-    if (rec) { cap = `${esc(`${rec.transcript} ${rec.interim}`.trim())}<span class="cur"></span>`; you = true; }
-    else if (st === 'composing' && p?.trace?.partial) { const t = p.trace.partial; cap = `${esc(t.length > 220 ? `…${t.slice(-220)}` : t)}<span class="cur"></span>`; forming = true; }
-    else if (lastReply && (speakingAgent || now - speakStart < 20000)) {
-      const t = lastReply.text, n = Math.min(t.length, lastReply.lit);
-      cap = `<span class="lit">${esc(t.slice(0, n))}</span>${esc(t.slice(n))}`;
-    } else if (st === 'idle') cap = '';
+    const { cap, you, forming } = caption(now, st, p, 220);
     if (ui.caption.innerHTML !== cap) ui.caption.innerHTML = cap;
     ui.caption.classList.toggle('you', you);
     ui.caption.classList.toggle('forming', forming);
@@ -557,6 +577,40 @@ export function initComms(store, { $, params }) {
     if (rec && (now - rec.started) / 1000 >= MAX_REC_S) stopRec(true);
   }
 
+  function caption(now, st, p, max) {
+    if (rec) return { cap: `${esc(`${rec.transcript} ${rec.interim}`.trim())}<span class="cur"></span>`, you: true, forming: false };
+    if (st === 'composing' && p?.trace?.partial) { const t = p.trace.partial; return { cap: `${esc(t.length > max ? `…${t.slice(-max)}` : t)}<span class="cur"></span>`, you: false, forming: true }; }
+    if (lastReply && (speakingAgent || now - speakStart < 20000)) {
+      const t = lastReply.text, n = Math.min(t.length, lastReply.lit);
+      const from = n > max ? n - Math.floor(max * 0.6) : 0;
+      return { cap: `${from ? '…' : ''}<span class="lit">${esc(t.slice(from, n))}</span>${esc(t.slice(n, from + max))}`, you: false, forming: false };
+    }
+    return { cap: '', you: false, forming: false };
+  }
+
+  // The big Clawd on the main HUD.
+  function renderHud(now, dt, k, p) {
+    const st = coreState();
+    hud.core.scale = k;
+    hud.core.set(st);
+    hud.core.frame(dt);
+    hud.panel.dataset.state = st;
+    const html = LABEL[st];
+    if (html !== hudText) { hud.state.textContent = html; hudText = html; }
+    const { cap, you, forming } = caption(now, st, p, 120);
+    if (cap !== hudCap) { hud.caption.innerHTML = cap; hudCap = cap; }
+    hud.caption.classList.toggle('you', you);
+    hud.caption.classList.toggle('forming', forming);
+    const step = st === 'thinking' || st === 'composing' ? (p?.progress ? `⚙ ${String(p.progress).toUpperCase()}` : p?.trace?.steps?.length ? `◌ ${String(p.trace.steps[p.trace.steps.length - 1].text).toUpperCase()}` : '') : st === 'offline' ? 'HERMES AGENT IS NOT ANSWERING' : '';
+    if (step !== hudStep) { hud.step.textContent = step; hudStep = step; }
+    const a = agentOf(current);
+    const link = !a.ready ? 'NO LINK' : a.online === false ? 'OFFLINE' : 'LINKED';
+    if (hud.link.textContent !== link) { hud.link.textContent = link; hud.link.className = !a.ready ? 'warn' : a.online === false ? 'bad' : 'good'; }
+    const tip = rec ? (secure ? `${mode === 'note' ? 'RECORDING' : 'LISTENING'} ${mmss((now - rec.started) / 1000)} · RELEASE TO SEND` : '') : secure ? 'HOLD CLAWD TO TALK' : 'MIC NEEDS HTTPS · TAP ⤢ LINK TO TYPE';
+    if (hud.tip.textContent !== tip) hud.tip.textContent = tip;
+    if (rec && (now - rec.started) / 1000 >= MAX_REC_S) stopRec(true);
+  }
+
   // ------------------------------------------------------------ cognition: the steps and the thought stream
   let cogKey = '', cogFor = null, thoughtShown = 0, thoughtHtml = '', toolsSeen = new Map(), stepsShown = { id: null, n: 0 };
   function activeTrace(p) {
@@ -577,12 +631,7 @@ export function initComms(store, { $, params }) {
       return;
     }
     const { e, live } = at, tr = e.trace, steps = tr.steps || [];
-    // tools launch out of the core as they start
     const tools = steps.filter((s) => s.kind === 'tool');
-    const seenN = toolsSeen.get(e.id) ?? (live ? 0 : tools.length);
-    for (const s of tools.slice(seenN)) core.addNode(s.text);
-    toolsSeen.set(e.id, tools.length);
-    if (toolsSeen.size > 20) toolsSeen.delete(toolsSeen.keys().next().value);
 
     const elapsed = live ? Date.now() - tr.t0 : tr.ms;
     ui.cgLive.textContent = live ? (tr.partial ? '● COMPOSING' : '● LIVE') : 'LAST TRACE';
@@ -680,6 +729,7 @@ export function initComms(store, { $, params }) {
 
   // ------------------------------------------------------------ boot
   ui.hint.textContent = baseHint();
+  requestAnimationFrame(loop);
   if (params.get('comms') === '1') setTimeout(() => open(), 500);
   return { open, close, auth };
 }

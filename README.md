@@ -83,10 +83,16 @@ cameras, just the numbers, laid out for an iPad mini in landscape.
 
 ![Clawd HUD](docs/hud.png)
 
+* **CLAWD**, in the middle: a big holographic core with Clawd himself inside it, his room sprite projected as a
+  flickering, scanlined hologram on a light beam. **Hold him to talk** (or tap to start and again to send), straight
+  from the main screen; TALK or NOTE on the left picks a conversation or a voice note. He blinks and bobs on standby,
+  raises his claws and opens his eyes wide while he listens, turns gold with a loading bar while he works (the tool he
+  is using shows in the corner and orbits him), and talks, with his mouth moving and the words lighting up underneath,
+  when he answers. **⤢ LINK** opens the full neural link with his thinking.
 * **CORE // HOMELAB**: CPU, RAM and temperature rings, `/` and `/mnt`, fan, load, uptime, active
   subagents, and a 6-hour CPU/RAM trace.
 * **POWER // FOXESS**: battery ring, solar, house load, grid import/export.
-* **UPLINK // STARLINK**: an animated sky with the dish tracking a satellite, packets streaming down
+* **UPLINK // STARLINK** (under Clawd): an animated sky with the dish tracking a satellite, packets streaming down
   (cyan) and up (orange) at a rate that follows the real throughput, handovers, and the
   obstruction wedge. Down/up, ping and drop rate, plus obstruction, SNR, GPS, azimuth/elevation,
   dish uptime, firmware and any dish alerts. Below it, throughput and latency charts with ping

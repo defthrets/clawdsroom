@@ -157,7 +157,9 @@ html, body {
 }
 .core { grid-column: 1; grid-row: 1; }
 .power { grid-column: 1; grid-row: 2; }
-.uplink { grid-column: 2; grid-row: 1 / span 2; }
+.center { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+.center .clawd-panel { flex: 1.25 1 0; }
+.center .uplink { flex: 1 1 0; }
 .net { grid-column: 3; grid-row: 1 / span 2; }
 
 /* ring gauges (SVG built in hud.js) */
@@ -321,6 +323,48 @@ html, body {
 .comms-btn svg { width: 16px; height: 16px; }
 .comms-btn.on { background: var(--glow); color: var(--bg); text-shadow: none; }
 .badge { position: absolute; top: 2px; right: 3px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--s-up); color: #fff; font-size: 9px; letter-spacing: 0; display: grid; place-items: center; padding: 0 3px; animation: pulse 1.2s infinite; }
+
+/* ---------------------------------------------------------------- the Clawd console on the main HUD */
+.clawd-panel { padding-bottom: 8px; transition: border-color 0.4s, box-shadow 0.4s; }
+.clawd-panel h2 em { margin-right: 8px; }
+.hud-expand { font: inherit; font-size: 9px; letter-spacing: 0.18em; color: var(--glow); background: rgba(34, 229, 255, 0.08); border: 1px solid var(--line-hi); padding: 3px 8px; cursor: pointer; }
+.hud-core-wrap { position: relative; flex: 1; min-height: 0; margin: -4px -10px 0; }
+#hud-core { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; touch-action: none; -webkit-touch-callout: none; }
+.hud-step { position: absolute; left: 12px; top: 4px; max-width: 30%; font-size: 9px; letter-spacing: 0.16em; color: var(--warn); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 8px rgba(250, 204, 21, 0.6); pointer-events: none; }
+.hud-mode { position: absolute; left: 12px; bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
+.hud-mode button { font: inherit; font-size: 8.5px; font-weight: 700; letter-spacing: 0.2em; width: 58px; padding: 5px 0; cursor: pointer; color: var(--muted); background: rgba(34, 229, 255, 0.04); border: 1px solid rgba(34, 229, 255, 0.22); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.hud-mode button.sel { color: var(--glow); border-color: var(--glow); background: rgba(34, 229, 255, 0.15); }
+.hud-mode button[data-mode=note].sel { color: #ff9a5c; border-color: #ff9a5c; background: rgba(255, 130, 60, 0.14); }
+.hud-tip { position: absolute; right: 12px; bottom: 8px; font-size: 8.5px; letter-spacing: 0.22em; color: var(--dim); text-align: right; pointer-events: none; animation: tip 3s ease-in-out infinite; }
+@keyframes tip { 50% { color: var(--glow); text-shadow: 0 0 8px rgba(34, 229, 255, 0.6); } }
+.hud-state { text-align: center; font-size: 15px; font-weight: 800; letter-spacing: 0.46em; padding-left: 0.46em; color: var(--glow); text-shadow: 0 0 12px rgba(34, 229, 255, 0.8), 2px 0 rgba(255, 60, 120, 0.3), -2px 0 rgba(60, 200, 255, 0.3); }
+.hud-caption { min-height: 30px; margin-top: 3px; text-align: center; font-size: 11.5px; line-height: 1.35; color: rgba(216, 246, 255, 0.55); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 0 8px; }
+.hud-caption .lit { color: #fff; text-shadow: 0 0 10px rgba(255, 138, 61, 0.9); }
+.hud-caption.you { color: #fff; text-shadow: 0 0 10px rgba(34, 229, 255, 0.8); }
+.hud-caption.forming { color: #ffe9cc; text-shadow: 0 0 10px rgba(255, 170, 60, 0.7); }
+.hud-caption .cur { display: inline-block; width: 7px; height: 12px; background: var(--glow); vertical-align: -2px; margin-left: 3px; animation: blink 1s steps(1) infinite; }
+.clawd-panel[data-state=listening] { border-color: #fff; box-shadow: inset 0 0 30px rgba(34, 229, 255, 0.25); }
+.clawd-panel[data-state=listening] .hud-state { color: #fff; }
+.clawd-panel[data-state=note] { border-color: #ff9a5c; } .clawd-panel[data-state=note] .hud-state { color: #ff9a5c; text-shadow: 0 0 12px rgba(255, 130, 60, 0.8); }
+.clawd-panel[data-state=thinking] { border-color: rgba(250, 204, 21, 0.6); } .clawd-panel[data-state=thinking] .hud-state { color: var(--warn); text-shadow: 0 0 12px rgba(250, 204, 21, 0.7); }
+.clawd-panel[data-state=composing] .hud-state { color: #ffb347; text-shadow: 0 0 12px rgba(255, 170, 60, 0.8); }
+.clawd-panel[data-state=speaking] { border-color: rgba(255, 138, 61, 0.7); } .clawd-panel[data-state=speaking] .hud-state { color: #ff8a3d; text-shadow: 0 0 12px rgba(255, 120, 50, 0.8); }
+.clawd-panel[data-state=offline] .hud-state { color: var(--bad); text-shadow: 0 0 12px rgba(244, 63, 94, 0.7); }
+.clawd-panel[data-state=listening] .hud-tip, .clawd-panel[data-state=note] .hud-tip { color: #fff; animation: none; }
+
+/* the compact Starlink panel under him */
+.uplink.compact .sky-wrap { height: 92px; }
+.uplink.compact .sky-hud b { font-size: 15px; }
+.uplink.compact .sky-hud b small { font-size: 9px; }
+.uplink.compact .sky-hud.tl, .uplink.compact .sky-hud.tr { top: 4px; }
+.uplink.compact .sky-hud.bl, .uplink.compact .sky-hud.br { bottom: 4px; }
+.uplink.compact .sky-off { font-size: 10px; padding: 3px 10px; }
+.uplink.compact .chips { flex-wrap: nowrap; overflow: hidden; margin: 5px 0 3px; }
+.uplink.compact .chip { font-size: 8.5px; padding: 2px 5px; }
+.charts2 { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+.charts2 .ch { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.charts2 .chart-head { font-size: 8.5px; letter-spacing: 0.12em; margin-top: 0; }
+.charts2 .range { margin-left: 6px; padding: 1px 5px; font-size: 8px; }
 
 /* ---------------------------------------------------------------- the neural link */
 .comms {
