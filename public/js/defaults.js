@@ -185,6 +185,10 @@ export const DEFAULT_STATE = {
     sunset: '18:30',
   },
 
+  comms: {                     // the HUD's voice link to the agents (server/comms.js manages it)
+    log: [],                   // [{id, at, from, to, kind: talk|note|reply, text, audio?, status, error?}]
+  },
+
   settings: {
     sleep_after_min: 20,       // auto-sleep when clawd.last_active is older than this (0 = never)
     reload_hours: 24,          // the iPad page reloads itself this often (0 = never)

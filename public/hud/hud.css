@@ -106,7 +106,7 @@ html, body {
 /* ---------------------------------------------------------------- header */
 .top {
   display: grid;
-  grid-template-columns: 260px 1fr auto 170px;
+  grid-template-columns: 260px 1fr auto auto 170px;
   align-items: center;
   gap: 14px;
   border-bottom: 1px solid var(--line);
@@ -308,6 +308,103 @@ html, body {
 .ll .lx { overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .ll.bad .lk { color: var(--bad); }
 
+/* ---------------------------------------------------------------- comms */
+.comms-btn {
+  position: relative;
+  display: flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.2em;
+  color: var(--glow); background: rgba(34, 229, 255, 0.08);
+  border: 1px solid var(--line-hi); padding: 8px 12px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  text-shadow: 0 0 8px rgba(34, 229, 255, 0.6);
+}
+.comms-btn svg { width: 16px; height: 16px; }
+.comms-btn.on { background: var(--glow); color: var(--bg); text-shadow: none; }
+.badge { position: absolute; top: 2px; right: 3px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--s-up); color: #fff; font-size: 9px; letter-spacing: 0; display: grid; place-items: center; padding: 0 3px; animation: pulse 1.2s infinite; }
+
+.comms {
+  position: absolute;
+  left: 318px; top: 72px; right: 12px; bottom: 12px;
+  z-index: 5;
+  background: #030912;
+  border-color: var(--line-hi);
+  box-shadow: 0 0 40px rgba(34, 229, 255, 0.15);
+  pointer-events: auto;
+}
+.cm-close { margin-left: auto; font: inherit; font-size: 14px; color: var(--muted); background: none; border: 1px solid var(--line); width: 30px; height: 26px; cursor: pointer; }
+.cm-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 14px; }
+.cm-k { font-size: 9.5px; letter-spacing: 0.22em; color: var(--muted); margin-bottom: 6px; }
+.cm-k b { color: var(--glow); font-weight: 600; }
+.cm-ctl { display: flex; flex-direction: column; min-height: 0; }
+.cm-agents { display: grid; gap: 6px; }
+.agent {
+  font: inherit; text-align: left; cursor: pointer;
+  display: grid; grid-template-columns: 14px 1fr; grid-template-rows: auto auto; column-gap: 8px;
+  padding: 8px 10px; color: var(--text);
+  background: rgba(34, 229, 255, 0.03); border: 1px solid var(--line);
+}
+.agent.sel { border-color: var(--glow); background: rgba(34, 229, 255, 0.1); box-shadow: inset 3px 0 0 var(--glow); }
+.ag-dot { grid-row: 1 / span 2; align-self: center; width: 9px; height: 9px; border-radius: 50%; background: var(--dim); }
+.agent.ready .ag-dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
+.agent.busy .ag-dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); animation: pulse 0.8s infinite; }
+.agent.talking .ag-dot { background: var(--glow); box-shadow: 0 0 10px var(--glow); animation: pulse 0.4s infinite; }
+.ag-name { font-size: 15px; font-weight: 700; letter-spacing: 0.2em; }
+.ag-sub { font-size: 9px; letter-spacing: 0.14em; color: var(--muted); }
+.cm-mode { display: grid; grid-template-columns: 1fr 1fr; margin: 10px 0 4px; border: 1px solid var(--line); }
+.cm-mode button { font: inherit; font-size: 10.5px; letter-spacing: 0.18em; padding: 7px 0; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.cm-mode button.sel { background: rgba(34, 229, 255, 0.14); color: var(--glow); }
+.cm-mode button[data-mode=note].sel { background: rgba(224, 96, 26, 0.16); color: #ff9a5c; }
+
+.cm-ptt-wrap { position: relative; flex: 1; min-height: 190px; display: grid; place-items: center; }
+#cm-level { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cm-ptt {
+  width: 150px; height: 150px; border-radius: 50%;
+  font: inherit; font-size: 10px; letter-spacing: 0.16em; font-weight: 700;
+  color: var(--glow); cursor: pointer; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  background: radial-gradient(circle at 50% 40%, rgba(34, 229, 255, 0.22), rgba(34, 229, 255, 0.04) 70%);
+  border: 2px solid var(--glow);
+  box-shadow: 0 0 24px rgba(34, 229, 255, 0.35), inset 0 0 24px rgba(34, 229, 255, 0.2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.2s;
+}
+.cm-ptt svg { width: 38px; height: 38px; }
+.cm-ptt::before { content: ''; position: absolute; width: 176px; height: 176px; border-radius: 50%; border: 1px dashed rgba(34, 229, 255, 0.35); animation: spin 20s linear infinite; pointer-events: none; }
+.comms.recording .cm-ptt { transform: scale(0.96); background: radial-gradient(circle, rgba(244, 63, 94, 0.35), rgba(244, 63, 94, 0.06) 70%); border-color: var(--bad); color: #fff; box-shadow: 0 0 36px rgba(244, 63, 94, 0.55); }
+.comms.no-mic .cm-ptt { opacity: 0.4; }
+.cm-live { min-height: 32px; max-height: 48px; overflow: hidden; font-size: 11px; color: var(--text); border-left: 2px solid var(--glow); padding: 3px 8px; margin-bottom: 4px; background: rgba(34, 229, 255, 0.05); }
+.cm-hint { font-size: 9.5px; letter-spacing: 0.16em; color: var(--muted); text-align: center; min-height: 14px; }
+.cm-hint.bad { color: var(--bad); }
+.cm-row { display: flex; gap: 6px; margin-top: 8px; }
+.cm-row button { flex: 1; font: inherit; font-size: 10px; letter-spacing: 0.14em; padding: 7px 0; color: var(--muted); background: none; border: 1px solid var(--line); cursor: pointer; }
+.cm-row .cm-cancel { color: var(--bad); border-color: var(--bad); }
+.cm-row .cm-speak.sel { color: var(--glow); border-color: var(--line-hi); }
+
+.cm-chat { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); padding-left: 14px; }
+.cm-thread { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 8px; padding: 4px 4px 4px 0; }
+.cm-empty { margin: auto; text-align: center; color: var(--dim); font-size: 11px; letter-spacing: 0.18em; line-height: 1.8; }
+.cm-empty small { letter-spacing: 0.08em; }
+.msg { max-width: 82%; padding: 7px 10px; border: 1px solid var(--line); background: rgba(34, 229, 255, 0.04); position: relative; animation: rowin 0.6s ease; }
+.msg.you { align-self: flex-end; border-color: rgba(34, 229, 255, 0.4); }
+.msg.them { align-self: flex-start; border-color: rgba(224, 96, 26, 0.45); background: rgba(224, 96, 26, 0.06); }
+.msg.failed { border-color: var(--bad); }
+.msg-meta { font-size: 8.5px; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 4px; }
+.msg-meta b { font-weight: 600; color: var(--glow); }
+.msg-meta .st-failed { color: var(--bad); }
+.msg-meta .st-queued { color: var(--warn); }
+.msg-meta .st-thinking, .msg-meta .st-sending, .msg-meta .st-transcribing { color: var(--warn); }
+.msg-body { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; color: var(--text); white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.msg-err { font-size: 9.5px; color: var(--bad); margin-top: 4px; }
+.play { flex: none; width: 26px; height: 26px; border-radius: 50%; font-size: 10px; color: var(--bg); background: var(--glow); border: 0; cursor: pointer; }
+.msg.them .play { background: var(--s-up); color: #fff; }
+.dots { display: flex; gap: 4px; margin-top: 6px; }
+.dots i { width: 5px; height: 5px; background: var(--warn); animation: pulse 0.9s infinite; }
+.dots i:nth-child(2) { animation-delay: 0.2s; } .dots i:nth-child(3) { animation-delay: 0.4s; }
+.cm-input { display: flex; gap: 6px; margin-top: 8px; }
+.cm-input input { flex: 1; font: inherit; font-size: 13px; color: var(--text); background: rgba(34, 229, 255, 0.05); border: 1px solid var(--line); padding: 8px 10px; outline: none; -webkit-user-select: text; user-select: text; }
+.cm-input input:focus { border-color: var(--glow); }
+.cm-input button { font: inherit; font-size: 11px; letter-spacing: 0.2em; color: var(--bg); background: var(--glow); border: 0; padding: 0 16px; cursor: pointer; }
+
 /* ---------------------------------------------------------------- scanline */
 .scan {
   position: absolute;
@@ -326,5 +423,5 @@ html, body {
 @keyframes sweep { from { top: -120px; } to { top: 100%; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .scan::after, .logo, .alert, .panel h2 i { animation: none; }
+  .scan::after, .logo, .alert, .panel h2 i, .cm-ptt::before { animation: none; }
 }

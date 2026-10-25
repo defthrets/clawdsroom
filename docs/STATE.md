@@ -11,6 +11,12 @@ Everything the room shows comes from one JSON document, the **state**, plus a st
 * `GET  /api/history` → up to 6h of cpu/ram/temp/disk/battery/solar/network/Starlink samples (one per 30s), for the trend charts
 * `GET  /api/stream` → Server-Sent Events (`state` and `event` messages). The iPad listens here.
 * `GET  /api/health` → `{ok: true, clients: n}`
+* `GET  /api/comms/agents` → who the HUD can talk to: `[{id, label, ready, type, voice}]`
+* `GET  /api/comms/log?agent=&since=` → the comms thread
+* `POST /api/comms/send` → `{to, kind: talk|note, text}`, a typed message to an agent
+* `POST /api/comms/voice?to=&kind=&text=` → a voice message: the recording as the body (`audio/*`)
+* `POST /api/comms/reply` → `{from, text, audio_url?}` (or an `audio/*` body with `?from=&text=`): an agent answers, spoken on the HUD
+* `GET  /api/comms/audio/<file>` → a stored recording (byte ranges supported)
 
 Defaults live in [`public/js/defaults.js`](../public/js/defaults.js); the server deep-merges
 whatever you send on top of them. Objects merge recursively, arrays and scalars replace,
@@ -62,6 +68,7 @@ curl -s -X POST localhost:8787/api/state -d 'power.battery=42' -d 'power.solar_w
 | `starlink.obstructed`, `starlink.fraction_obstructed` (0..1), `starlink.snr_ok`, `starlink.gps_sats`, `starlink.azimuth`, `starlink.elevation`, `starlink.uptime`, `starlink.software`, `starlink.hardware`, `starlink.eth_mbps`, `starlink.alerts[]`, `starlink.updated` | HUD chips and alerts. The HUD calls the dish stale when `updated` is more than 2 minutes old. |
 | `crew.<name>.online`, `crew.<name>.emoji` | The crew photo: bright when home, grey when away. |
 | `weather.condition` (`clear`/`cloudy`/`rain`), `weather.sunrise`, `weather.sunset` | Clouds, rain, and when the sky turns. |
+| `comms.log[]` | The HUD's comms thread, newest last (60 kept): `{id, at, from, to, kind: talk\|note\|reply, text, audio?, status, error?}`. Managed by the server, see `server/comms.js`. |
 | `settings.sleep_after_min`, `settings.reload_hours` | Auto-sleep; the page reloads itself every N hours (24). |
 
 ## Events
@@ -87,6 +94,7 @@ Events also bump the related counters in the state (see `applyEvent` in `public/
 | `diary` | `excerpt` | The journal on the nightstand glows. `memory.last_diary` = now, `notes` +1. |
 | `solar` | `note` | Bolt on the battery with the note. |
 | `note` | `text` | Just the ticker (and a bubble if there's text). |
+| `comms` | `from`, `to`, `kind`, `text` | Sent by the server for each comms message and reply (ticker + HUD log). |
 
 Daily counters (`cams.events_today`, `bus.messages_today`, `chirpa.*_today`) reset at midnight (server local time).
 

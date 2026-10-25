@@ -4,6 +4,7 @@
 import { Store } from '/js/state.js';
 import { connect } from '/js/net.js';
 import { fmtUptime, fmtAgo, clamp } from '/js/util.js';
+import { initComms } from '/hud/comms.js';
 
 const STAGE_W = 1133, STAGE_H = 744;
 const STALE_MS = 120000;           // Starlink counts as stale after 2 minutes without a push
@@ -503,7 +504,7 @@ function shortName(p) {
 // ------------------------------------------------------------------ DOM panels
 const TAGS = {
   bird: 'BIRD', bark: 'ALERT', telegram: 'DM', bus: 'BUS', cam: 'CAM', photo: 'PHOTO', plane: 'ADS-B', sensor: '433',
-  cron: 'CRON', subagent: 'AGENT', say: 'SAY', look: 'VISION', dream: 'DREAM', diary: 'DIARY', solar: 'POWER', note: 'NOTE',
+  cron: 'CRON', subagent: 'AGENT', say: 'SAY', comms: 'COMMS', look: 'VISION', dream: 'DREAM', diary: 'DIARY', solar: 'POWER', note: 'NOTE',
 };
 function eventText(e) {
   switch (e.type) {
@@ -517,6 +518,7 @@ function eventText(e) {
     case 'cron': return e.name || 'job';
     case 'subagent': return `${e.action === 'done' ? 'returned' : 'deployed'} ${e.name || 'helper'}`;
     case 'say': return e.text || '';
+    case 'comms': return `${String(e.from || '').toUpperCase()}→${String(e.to || '').toUpperCase()} ${e.text || ''}`;
     case 'look': return e.what || 'looking';
     case 'dream': return e.text || '';
     case 'diary': return e.excerpt || 'written';
@@ -705,6 +707,8 @@ connect(store, {
   },
 });
 
+const comms = initComms(store, { $, params });
+
 resize();
 tickClock();
 setInterval(tickClock, 1000);
@@ -746,4 +750,4 @@ setInterval(() => {
   if (hours > 0 && performance.now() > hours * 3600 * 1000) location.reload();
 }, 60000);
 
-window.hud = { store, live };
+window.hud = { store, live, comms };

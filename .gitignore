@@ -4,3 +4,5 @@ data/history.json
 data/*.bak
 .DS_Store
 *.log
+data/agents.json
+data/voice/

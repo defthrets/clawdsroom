@@ -7,6 +7,8 @@
 #   room do <activity> ["status"]            set clawd.activity (+ status) and touch last_active
 #   room get [jq-path]                       print the state (pipes through jq if installed)
 #   room events                              print recent events
+#   room reply <agent> "text"                answer on the HUD's comms (spoken aloud there)
+#   room inbox <agent>                       what the HUD has said to <agent> lately
 #
 # Env: ROOM_URL (default http://localhost:8787), ROOM_TOKEN (if the server has CLAWDSROOM_TOKEN)
 set -euo pipefail
@@ -15,7 +17,7 @@ ROOM_URL="${ROOM_URL:-http://localhost:8787}"
 AUTH=()
 if [[ -n "${ROOM_TOKEN:-}" ]]; then AUTH=(-H "Authorization: Bearer ${ROOM_TOKEN}"); fi
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
 # Turn key=value pairs into a JSON object. Numbers/booleans/null are kept bare, the rest quoted.
 to_json() {
@@ -45,5 +47,9 @@ case "$cmd" in
           else post /api/state "$(to_json "clawd.activity=$a" "clawd.last_active=$now")"; fi ;;
   get)    if command -v jq >/dev/null 2>&1; then curl -sS "$ROOM_URL/api/state" | jq "${1:-.}"; else curl -sS "$ROOM_URL/api/state"; echo; fi ;;
   events) if command -v jq >/dev/null 2>&1; then curl -sS "$ROOM_URL/api/events" | jq .; else curl -sS "$ROOM_URL/api/events"; echo; fi ;;
+  reply)  [[ $# -gt 1 ]] || usage; a="$1"; shift; post /api/comms/reply "$(to_json "from=$a" "text=$*")" ;;
+  inbox)  [[ $# -gt 0 ]] || usage
+          if command -v jq >/dev/null 2>&1; then curl -sS "$ROOM_URL/api/comms/log?agent=$1" | jq -r '.[] | select(.from=="you") | "\(.at/1000|strftime("%H:%M:%S")) [\(.kind)] \(.text) \(if .audio then "(audio: /api/comms/audio/"+.audio+")" else "" end)"'
+          else curl -sS "$ROOM_URL/api/comms/log?agent=$1"; echo; fi ;;
   *)      usage ;;
 esac

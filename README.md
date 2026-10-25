@@ -109,6 +109,65 @@ status with [grpcurl](https://github.com/fullstorydev/grpcurl) and pushes `starl
 scripts/examples/starlink.sh --loop 5     # every 5s, forever (or cron it once a minute)
 ```
 
+### Talking to Clawd and Hermes from the HUD
+
+Tap **COMMS** in the HUD's top bar to open the voice link. Pick **CLAWD** or **HERMES**, then either:
+
+![Comms](docs/hud-comms.png)
+
+* **TALK**: hold the big button and speak (or tap once to start and again to send). The agent's
+  reply appears in the thread and is **read out loud** on the iPad. When a reply arrives, the console
+  opens itself on that agent. Clawd's replies also come out of his mouth in the room.
+* **VOICE NOTE**: the same button leaves a recorded message. The audio is kept and the agent gets it
+  as a voice message with the transcript and a link to the recording.
+* Or type into the box under the thread.
+
+Every message and reply stays in the thread with a ▶ to play the audio back. The console closes on its
+own after 90 seconds of quiet.
+
+Setting it up:
+
+1. **Serve the HUD over HTTPS.** iPad Safari only lets a page use the microphone over HTTPS. Give
+   the server a certificate and it serves HTTPS on a second port (`HTTPS_PORT`, default 8788)
+   next to plain HTTP:
+
+   ```bash
+   # with Tailscale (the iPad on the tailnet; a real certificate, nothing to install on the iPad)
+   tailscale cert homelab.your-tailnet.ts.net
+   TLS_CERT=$PWD/homelab.your-tailnet.ts.net.crt TLS_KEY=$PWD/homelab.your-tailnet.ts.net.key npm start
+   # then on the iPad: https://homelab.your-tailnet.ts.net:8788/hud/
+   ```
+
+   Or use [mkcert](https://github.com/FiloSottile/mkcert) (`mkcert 192.168.1.253`), AirDrop `rootCA.pem` to the
+   iPad, install it, and turn it on under Settings → General → About → Certificate Trust Settings.
+   Then open `https://192.168.1.253:8788/hud/` and add *that* to the home screen. Without HTTPS the
+   console still works for typing and spoken replies, just not the mic.
+
+2. **Tell the server how to reach the agents.** Copy `scripts/examples/agents.example.json` to
+   `data/agents.json` (picked up live, no restart). Both agents speak OpenAI-style chat completions,
+   so the reply comes straight back:
+   * **Clawd (OpenClaw):** turn on the gateway's HTTP endpoint (`gateway.http.endpoints.chatCompletions.enabled: true`)
+     and use the gateway token as the key. The model `openclaw:main` picks the agent, and the fixed `user` keeps one ongoing
+     session for the HUD.
+   * **Hermes Agent:** its API server on port 8642, with `API_SERVER_KEY` as the key and `hermes-agent` as the model.
+     `history: 10` sends the last ten exchanges along with each message.
+
+   `"key": "$NAME"` reads the key from the environment, so secrets stay out of the file. Other link types:
+   `openclaw-hook` (POST to OpenClaw's `/hooks/agent`; Clawd answers later with `room reply clawd "..."`),
+   `webhook` (gets `{id, to, kind, text, message, audio_url, reply_url}`; a `{"reply": "..."}` in the response counts)
+   and `command` (a shell command with `COMMS_TEXT`, `COMMS_AUDIO`, `COMMS_AUDIO_URL`... in its environment; its
+   stdout is the reply). An agent with no link still gets its messages in the thread, marked queued. It can read them with
+   `room inbox <agent>` and answer with `room reply <agent> "..."`.
+
+3. **Speech-to-text and voices (optional).** Safari can transcribe as you speak (it needs Siri & Dictation on, and
+   doesn't always manage it from a home-screen app). When it does, that text goes with the recording. For transcripts you can count on, point `STT_URL` at any OpenAI-style
+   `/v1/audio/transcriptions` endpoint (a local [Speaches](https://github.com/speaches-ai/speaches)/faster-whisper server, or
+   OpenAI with `STT_KEY`), and it will transcribe whatever Safari didn't. Replies are spoken with the iPad's own voices
+   (set `"voice"` per agent to pick one, e.g. `Daniel`), or set `TTS_URL` (an OpenAI-style `/v1/audio/speech`) and
+   `"tts_voice"` per agent for server-made audio.
+
+If `CLAWDSROOM_TOKEN` is set, open the HUD once with `?token=...` and it remembers it.
+
 ## Wiring it to the homelab
 
 The whole contract is two HTTP endpoints: **patch the state** (what is true now) and
@@ -202,6 +261,11 @@ Environment variables for the server:
 | `COLLECT_SYSTEM` | `1` on Linux | Auto-fill `system.*` every `SYSTEM_INTERVAL_MS` (10000). |
 | `DISK_ROOT`, `DISK_MNT` | `/`, `/mnt` | Paths reported as `disk_root` / `disk_mnt`. |
 | `NET_IFACE` | default route | Interface the HUD reports RX/TX for. |
+| `TLS_CERT`, `TLS_KEY`, `HTTPS_PORT` | unset, unset, `8788` | Also serve HTTPS (the HUD's mic needs it). |
+| `AGENTS_FILE` | `data/agents.json` | How to reach Clawd, Hermes and any other agent (see above). |
+| `PUBLIC_URL` | the request's host | Base URL for the audio links handed to agents. |
+| `STT_URL`, `STT_KEY`, `STT_MODEL`, `STT_LANGUAGE` | unset, `whisper-1` | Server-side transcription of voice messages. |
+| `TTS_URL`, `TTS_KEY`, `TTS_MODEL`, `TTS_VOICE` | unset, `tts-1`, `alloy` | Server-side voices for replies. |
 
 Display settings live in the state (`settings.*`): `sleep_after_min` (20), `reload_hours` (24),
 `theme_hour_offset` (shift the day/night cycle for testing).
@@ -211,6 +275,7 @@ Display settings live in the state (`settings.*`): `sleep_after_min` (20), `relo
 ```
 server/server.js     HTTP + SSE + persistence (no dependencies)
 server/system.js     Linux system collector; server/network.js: throughput + TCP connections
+server/comms.js      the HUD's voice link to the agents
 public/js/defaults.js  the state contract (shared by server and browser)
 public/js/reducer.js   deep-merge + what each event does to the state (shared)
 public/js/scene.js     the house: layout, furniture, sky, lighting, tap targets
@@ -218,7 +283,7 @@ public/js/actors.js    Clawd, the dog, the bird, the bots, the bus
 public/js/effects.js   particles, labels, smoke, rain
 public/js/hud.js       stat tiles, ticker, toasts, info card
 public/js/demo.js      the simulation used when nothing is wired up
-public/hud/             the ops HUD (/hud/): homelab, Starlink, connections
+public/hud/             the ops HUD (/hud/): homelab, Starlink, connections, comms
 scripts/room           CLI; scripts/examples/ collectors (frigate, immich, starlink)
 ```
 

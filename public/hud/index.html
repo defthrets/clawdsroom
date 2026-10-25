@@ -31,6 +31,7 @@
         <div class="now-v" id="now">Clawd is settling in…</div>
       </div>
       <div class="alerts" id="alerts"></div>
+      <button class="comms-btn" id="comms-btn" aria-label="talk to the agents"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>COMMS<span class="badge hidden" id="comms-badge"></span></button>
       <div class="clock">
         <div class="clock-t" id="clock">--:--<span id="secs">:--</span></div>
         <div class="clock-d" id="date">---</div>
@@ -116,6 +117,42 @@
         <div class="log-lines" id="log"></div>
       </div>
     </footer>
+
+    <!-- comms: talk to the agents -->
+    <section class="panel comms hidden" id="comms" role="dialog" aria-label="Comms">
+      <h2><i></i>COMMS <b>// VOICE LINK</b><button class="cm-close" id="cm-close" aria-label="close">✕</button></h2>
+      <div class="cm-body">
+        <div class="cm-ctl">
+          <div class="cm-k">CHANNEL</div>
+          <div class="cm-agents" id="cm-agents"></div>
+          <div class="cm-mode">
+            <button class="sel" data-mode="talk">TALK</button>
+            <button data-mode="note">VOICE NOTE</button>
+          </div>
+          <div class="cm-ptt-wrap">
+            <canvas id="cm-level"></canvas>
+            <button class="cm-ptt" id="cm-ptt" aria-label="hold to talk">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <span id="cm-ptt-label">HOLD TO TALK</span>
+            </button>
+          </div>
+          <div class="cm-live hidden" id="cm-live"></div>
+          <div class="cm-hint" id="cm-hint"></div>
+          <div class="cm-row">
+            <button class="cm-cancel hidden" id="cm-cancel">✕ DISCARD</button>
+            <button class="cm-speak sel" id="cm-speak">🔊 SPEAK REPLIES</button>
+          </div>
+        </div>
+        <div class="cm-chat">
+          <div class="cm-k">THREAD <b>// <span id="cm-title">CLAWD</span></b></div>
+          <div class="cm-thread" id="cm-thread"></div>
+          <div class="cm-input">
+            <input id="cm-input" type="text" placeholder="or type a message…" autocomplete="off" enterkeyhint="send">
+            <button id="cm-send">SEND</button>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <div class="scan" aria-hidden="true"></div>
   </div>
