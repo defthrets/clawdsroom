@@ -14,6 +14,8 @@ It is one small zero-dependency Node server plus a canvas app. Nothing else to i
 
 ## Quick start
 
+Clawd can install all of it himself: point him at [docs/INSTALL-CLAWD.md](docs/INSTALL-CLAWD.md).
+
 ```bash
 git clone https://github.com/defthrets/clawdsroom /opt/clawdsroom
 cd /opt/clawdsroom
