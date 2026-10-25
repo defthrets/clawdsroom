@@ -128,23 +128,34 @@
       </header>
       <div class="nl-body">
         <div class="nl-stage">
-          <div class="nl-agents" id="cm-agents"></div>
-          <div class="nl-read tl"><span>SIGNAL</span><b id="cm-sig">—</b></div>
-          <div class="nl-read tr"><span>AMPLITUDE</span><b id="cm-amp">—</b></div>
-          <div class="nl-read bl"><span>CHANNEL</span><b id="cm-chan">—</b></div>
-          <div class="nl-read br"><span>T+</span><b id="cm-clock">00:00</b></div>
-          <canvas id="cm-core" class="nl-core" aria-label="hold to talk"></canvas>
-          <div class="nl-state" id="cm-state">STANDBY</div>
-          <div class="nl-caption" id="cm-caption"></div>
-          <div class="nl-controls">
-            <button class="nl-side" id="cm-cancel" disabled>✕ DISCARD</button>
-            <div class="nl-mode" role="radiogroup">
-              <button class="sel" data-mode="talk"><i></i>TALK</button>
-              <button data-mode="note"><i></i>VOICE NOTE</button>
+          <div class="nl-cog">
+            <div class="nl-agents" id="cm-agents"></div>
+            <div class="cog" id="cg">
+              <div class="cog-head"><span><i></i>COGNITION</span><em id="cg-live">IDLE</em></div>
+              <div class="cog-meta"><span>STEPS <b id="cg-steps">0</b></span><span>T+ <b id="cg-time">0.0s</b></span><span>TOOLS <b id="cg-tools">0</b></span></div>
+              <ol class="cog-steps" id="cg-list"></ol>
+              <div class="cog-k"><span>THOUGHT STREAM</span><em id="cg-chars"></em></div>
+              <div class="cog-thought" id="cg-thought"></div>
             </div>
-            <button class="nl-side sel" id="cm-speak">VOICE ON</button>
           </div>
-          <div class="nl-hint" id="cm-hint"></div>
+          <div class="nl-center">
+            <div class="nl-read tl"><span>SIGNAL</span><b id="cm-sig">—</b></div>
+            <div class="nl-read tr"><span>AMPLITUDE</span><b id="cm-amp">—</b></div>
+            <div class="nl-read bl"><span>CHANNEL</span><b id="cm-chan">—</b></div>
+            <div class="nl-read br"><span>T+</span><b id="cm-clock">00:00</b></div>
+            <canvas id="cm-core" class="nl-core" aria-label="hold to talk"></canvas>
+            <div class="nl-state" id="cm-state">STANDBY</div>
+            <div class="nl-caption" id="cm-caption"></div>
+            <div class="nl-controls">
+              <button class="nl-side" id="cm-cancel" disabled>✕ DISCARD</button>
+              <div class="nl-mode" role="radiogroup">
+                <button class="sel" data-mode="talk"><i></i>TALK</button>
+                <button data-mode="note"><i></i>VOICE NOTE</button>
+              </div>
+              <button class="nl-side sel" id="cm-speak">VOICE ON</button>
+            </div>
+            <div class="nl-hint" id="cm-hint"></div>
+          </div>
         </div>
         <aside class="nl-log">
           <div class="nl-k"><span>COMM LOG</span><em id="cm-count">0</em></div>

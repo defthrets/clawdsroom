@@ -8,6 +8,7 @@ const PALETTE = {
   note:      { core: [255, 130, 60], hot: [255, 220, 190] },
   sending:   { core: [120, 200, 255], hot: [230, 245, 255] },
   thinking:  { core: [250, 190, 40], hot: [255, 240, 190] },
+  composing: { core: [255, 170, 60], hot: [255, 245, 215] },
   speaking:  { core: [255, 120, 50], hot: [255, 230, 200] },
   offline:   { core: [244, 63, 94], hot: [255, 190, 200] },
 };
@@ -37,6 +38,15 @@ export class Core {
       return { x: Math.cos(th) * r, y, z: Math.sin(th) * r, s: Math.random() * TAU, k: 0.6 + Math.random() * 0.8 };
     });
     this.sats = Array.from({ length: 3 }, (_, i) => ({ a: (i / 3) * TAU, tilt: 0.35 + i * 0.5, sp: 0.9 + i * 0.35 }));
+    this.nodes = []; // tool calls launched onto an orbit: {label, born, a}
+  }
+
+  // A tool Clawd is using: it launches out of the core and orbits with its name for a while.
+  addNode(label) {
+    const a = this.nodes.length ? this.nodes[this.nodes.length - 1].a + 2.1 : -Math.PI / 3;
+    this.nodes.push({ label: String(label).toUpperCase().slice(0, 30), born: this.t, a });
+    if (this.nodes.length > 4) this.nodes.shift();
+    this.burst = Math.max(this.burst, 0.6);
   }
 
   set(state) { if (state !== this.state) { this.state = state; if (state === 'sending') this.burst = 1; } }
@@ -83,6 +93,7 @@ export class Core {
     // motion when nothing is feeding us
     if (st === 'speaking') this.target = Math.max(this.target * 0.9, 0.18 + 0.12 * Math.sin(t * 9) * Math.sin(t * 3.1));
     else if (st === 'thinking') this.target = 0.22 + 0.08 * Math.sin(t * 4);
+    else if (st === 'composing') this.target = Math.max(this.target * 0.9, 0.2 + 0.1 * Math.sin(t * 11));
     else if (st !== 'listening' && st !== 'note') this.target = 0.05 + 0.03 * Math.sin(t * 1.2);
     this.level = lerp(this.level, this.target, Math.min(1, dt * (this.target > this.level ? 14 : 4)));
     this.target *= 0.92;
@@ -143,7 +154,7 @@ export class Core {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.globalAlpha = boot;
-    const spin = st === 'thinking' ? 2.6 : st === 'sending' ? 3.5 : 0.5;
+    const spin = st === 'thinking' ? 2.6 : st === 'composing' ? 1.6 : st === 'sending' ? 3.5 : 0.5;
     for (let k = 0; k < 3; k++) {
       const r = R * (1.42 + k * 0.06);
       const a0 = t * spin * (k % 2 ? -1 : 1) * (1 + k * 0.3) + k * 2.1;
@@ -174,7 +185,7 @@ export class Core {
     ctx.restore();
 
     // the sphere
-    const rotY = t * (st === 'thinking' ? 1.1 : st === 'sending' ? 2 : 0.25);
+    const rotY = t * (st === 'thinking' ? 1.1 : st === 'composing' ? 0.7 : st === 'sending' ? 2 : 0.25);
     const rotX = 0.35 + Math.sin(t * 0.3) * 0.15;
     const cyY = Math.cos(rotY), syY = Math.sin(rotY), cxX = Math.cos(rotX), sxX = Math.sin(rotX);
     const proj = [];
@@ -210,6 +221,40 @@ export class Core {
         ctx.fillStyle = rgba(hot, 0.95);
         ctx.beginPath(); ctx.arc(cx + ox, cy + oy, 3, 0, TAU); ctx.fill();
       }
+    }
+
+    // tool nodes: fly out of the core, then orbit with their label, fading after ~14s
+    this.nodes = this.nodes.filter((n) => t - n.born < 14);
+    ctx.font = '600 9.5px ui-monospace, Menlo, monospace';
+    for (const n of this.nodes) {
+      const age = t - n.born;
+      const out = Math.min(1, age / 0.7), ease = 1 - (1 - out) ** 3;
+      const fade = age > 11 ? Math.max(0, 1 - (age - 11) / 3) : 1;
+      n.a += dt * 0.12;
+      const orbit = R * (0.2 + 1.18 * ease);
+      const x = cx + Math.cos(n.a) * orbit, y = cy + Math.sin(n.a) * orbit * 0.82;
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = rgba(hot, 0.35); ctx.lineWidth = 1;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(n.a) * R * 0.3, cy + Math.sin(n.a) * R * 0.3 * 0.82); ctx.lineTo(x, y); ctx.stroke();
+      ctx.setLineDash([]);
+      // diamond node with a pulse ring
+      ctx.fillStyle = rgba(hot, 1);
+      ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 6); ctx.lineTo(x - 6, y); ctx.closePath(); ctx.fill();
+      const pr = 6 + ((age * 1.4) % 1) * 12;
+      ctx.strokeStyle = rgba(hot, 0.6 * (1 - ((age * 1.4) % 1)));
+      ctx.beginPath(); ctx.arc(x, y, pr, 0, TAU); ctx.stroke();
+      if (out >= 1) {
+        const tw = ctx.measureText(n.label).width;
+        let right = x >= cx;
+        if (right && x + 14 + tw + 10 > w - 2) right = false;
+        if (!right && x - 14 - tw - 10 < 2) right = true;
+        const lx = Math.max(2, Math.min(w - tw - 12, right ? x + 14 : x - 14 - tw - 10)), ly = y - 9;
+        ctx.fillStyle = 'rgba(2,8,16,0.85)'; ctx.fillRect(lx, ly, tw + 10, 18);
+        ctx.strokeStyle = rgba(hot, 0.7); ctx.strokeRect(lx + 0.5, ly + 0.5, tw + 9, 17);
+        ctx.fillStyle = rgba(hot, 1); ctx.fillText(n.label, lx + 5, ly + 12.5);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // inner core glow

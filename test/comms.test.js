@@ -5,7 +5,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { compose, chatHistory, interpolate, hermesBase, parseSseBlock, progressLabel } from '../server/comms.js';
+import { compose, chatHistory, interpolate, hermesBase, parseSseBlock, progressLabel, Trace } from '../server/comms.js';
 
 const PORT = 19787 + Math.floor(Math.random() * 1000);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -38,6 +38,8 @@ before(async () => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       res.write(': keepalive\n\n');
       res.write(`event: hermes.tool.progress\ndata: ${JSON.stringify({ tool: 'terminal', label: 'checking the dish' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning_content: 'The user wants the status. ' } }] })}\n\n`);
+      res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning_content: 'Dish looks fine.' } }] })}\n\n`);
       setTimeout(() => {
         for (const part of ['heard', ': ', said]) res.write(`data: ${JSON.stringify({ object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: part } }] })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`);
@@ -79,6 +81,21 @@ test('compose, history, $ENV, hermes urls and SSE parsing', () => {
   assert.equal(progressLabel({ progress: { name: 'web_search' } }), 'web_search');
 });
 
+test('a trace throttles flushes but always flushes a new step', async () => {
+  const snaps = [];
+  const tr = new Trace((s) => snaps.push(s));
+  tr.step('rx', 'IN');
+  for (let i = 0; i < 20; i++) tr.think('x');
+  assert.equal(snaps.length, 2, 'the step and the first reasoning step flush at once, the deltas wait');
+  await new Promise((r) => setTimeout(r, 350));
+  assert.equal(snaps.at(-1).reasoning, 'x'.repeat(20));
+  tr.step('tool', 'web');
+  tr.step('tool', 'web');
+  assert.equal(snaps.at(-1).steps.filter((s) => s.kind === 'tool').length, 1, 'repeats are folded');
+  tr.close('done', 'OK');
+  assert.equal(tr.snapshot(true).steps.at(-1).kind, 'done');
+});
+
 test('lists agents without leaking their config, with Hermes health', async () => {
   const list = await (await fetch(`${BASE}/api/comms/agents`)).json();
   assert.deepEqual(list.find((a) => a.id === 'clawd'), { id: 'clawd', label: 'Clawd', ready: true, type: 'hermes', voice: null, online: true });
@@ -102,6 +119,13 @@ test('talking to Clawd goes through Hermes Agent with a session, and the streame
   const sent = (await (await fetch(`${BASE}/api/comms/log?agent=clawd`)).json()).find((e) => e.from === 'you');
   assert.equal(sent.status, 'delivered');
   assert.equal(sent.progress, null);
+  // the trace of the turn: what he did, what he thought, in order
+  assert.deepEqual(sent.trace.steps.map((s) => s.kind), ['rx', 'link', 'tool', 'reason', 'compose', 'done']);
+  assert.equal(sent.trace.steps[2].text, 'terminal: checking the dish');
+  assert.equal(sent.trace.reasoning, 'The user wants the status. Dish looks fine.');
+  assert.equal(sent.trace.partial, '');
+  assert.equal(sent.trace.done, true);
+  assert.ok(sent.trace.steps.every((s) => typeof s.at === 'number' && s.end >= s.at));
   const s = await (await fetch(`${BASE}/api/state`)).json();
   assert.equal(s.clawd.status, 'heard: status?'); // his speech bubble in the room
 });

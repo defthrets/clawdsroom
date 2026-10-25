@@ -126,6 +126,17 @@ thinks (with the tool he is using underneath), and pulses as he answers while hi
   voice message with the transcript and a link to the recording.
 * Or type into the box under the comm log.
 
+**Clawd's thinking, live.** Next to the core, the **COGNITION** panel shows each turn as it happens: a timeline of
+steps (packet received, transcribed, uplink to Hermes Agent, each tool he calls, reasoning, composing, response) with
+a running timer on the live one, and a **THOUGHT STREAM** where his reasoning types itself out. Each tool launches out
+of the core as a labelled node and orbits while he works. Once he starts writing, the core turns gold (COMPOSING)
+and the answer forms in the caption before it is spoken. Afterwards, tap **▸ TRACE** under any message in the comm log
+to see that turn's steps, timings and reasoning again.
+
+These come from Hermes Agent's stream: tool steps from its `hermes.tool.progress` events (on by default,
+`gateway.platforms.api_server.tool_progress_events`), reasoning from `reasoning_content` when the model streams it
+(some models and providers don't, and the panel says so), and the answer as it is written.
+
 Every message and reply stays in the comm log (new replies decrypt into place), with a ▶ to play the audio back. The console closes on its
 own after 90 seconds of quiet.
 

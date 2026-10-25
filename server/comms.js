@@ -20,6 +20,8 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 
 const LOG_MAX = 60;
+const TRACE_KEEP = 6;      // full traces (with reasoning) kept on the newest messages; older ones keep their steps
+const REASON_MAX = 6000;  // characters of reasoning kept per turn
 const AUDIO_KEEP = 300;
 const EXT = { 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'm4a', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const MIME = { m4a: 'audio/mp4', webm: 'audio/webm', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav' };
@@ -97,9 +99,53 @@ export function progressLabel(d) {
   return String([name, what].filter(Boolean).join(': ')).slice(0, 80);
 }
 
-// POST a streamed chat completion to Hermes Agent; returns the reply text. onProgress(label) as tools run.
+// The steps of one turn as the HUD shows them: what Clawd did, what he was thinking, what he is writing.
+// Changes are flushed at most every 300ms (always at once for a new step).
+export class Trace {
+  constructor(flush = () => {}) {
+    this.t0 = Date.now(); this.steps = []; this.reasoning = ''; this.partial = ''; this.tool = '';
+    this.flush = flush; this.last = 0; this.timer = null;
+  }
+  step(kind, text, extra = {}) {
+    const s = { kind, text: String(text || '').slice(0, 160), at: Date.now() - this.t0, ...extra };
+    const prev = this.steps[this.steps.length - 1];
+    if (prev && prev.kind === kind && prev.text === s.text) return;
+    if (prev && prev.end == null) prev.end = s.at;
+    this.steps.push(s);
+    if (this.steps.length > 40) this.steps.splice(1, 1);
+    if (kind === 'tool') this.tool = s.text;
+    this.kick(true);
+  }
+  think(delta) {
+    if (this.steps[this.steps.length - 1]?.kind !== 'reason') this.step('reason', 'REASONING');
+    this.reasoning = (this.reasoning + delta).slice(-REASON_MAX);
+    this.kick();
+  }
+  write(delta) {
+    if (this.steps[this.steps.length - 1]?.kind !== 'compose') this.step('compose', 'COMPOSING RESPONSE');
+    this.partial += delta;
+    this.kick();
+  }
+  kick(now = false) {
+    const wait = 300 - (Date.now() - this.last);
+    if (now || wait <= 0) { clearTimeout(this.timer); this.timer = null; this.last = Date.now(); this.flush(this.snapshot()); }
+    else if (!this.timer) this.timer = setTimeout(() => { this.timer = null; this.last = Date.now(); this.flush(this.snapshot()); }, wait);
+  }
+  close(kind, text) {
+    clearTimeout(this.timer); this.timer = null;
+    this.step(kind, text);
+    const last = this.steps[this.steps.length - 1];
+    if (last) last.end = last.at;
+  }
+  snapshot(final = false) {
+    return { t0: this.t0, ms: Date.now() - this.t0, done: final, steps: this.steps.map((s) => ({ ...s })), reasoning: this.reasoning, partial: final ? '' : this.partial.slice(-1500) };
+  }
+}
+
+// POST a streamed chat completion to Hermes Agent; returns the reply text. onEvent gets
+// {type: 'tool', label} | {type: 'tool_call', name} | {type: 'reasoning', delta} | {type: 'content', delta} as they stream.
 // The timeout is for silence, not the whole turn: Hermes sends keepalives while it works.
-export async function hermesChat(url, { key, session, sessionKey, model, messages }, { idleMs = 300000, onProgress = () => {} } = {}) {
+export async function hermesChat(url, { key, session, sessionKey, model, messages }, { idleMs = 300000, onEvent = () => {} } = {}) {
   const ac = new AbortController();
   let timer = setTimeout(() => ac.abort(), idleMs);
   const poke = () => { clearTimeout(timer); timer = setTimeout(() => ac.abort(), idleMs); };
@@ -134,10 +180,14 @@ export async function hermesChat(url, { key, session, sessionKey, model, message
         if (!ev) continue;
         if (ev.raw === '[DONE]') return text;
         const d = ev.data;
-        if (/tool\.progress/.test(ev.event) || /tool\.progress/.test(String(d?.object || d?.type || ''))) { onProgress(progressLabel(d)); continue; }
+        if (/tool\.progress/.test(ev.event) || /tool\.progress/.test(String(d?.object || d?.type || ''))) { onEvent({ type: 'tool', label: progressLabel(d) }); continue; }
         const ch = d?.choices?.[0];
         if (!ch) continue;
-        if (ch.delta?.content) text += ch.delta.content;
+        const delta = ch.delta || {};
+        const thought = delta.reasoning_content ?? delta.reasoning;
+        if (typeof thought === 'string' && thought) onEvent({ type: 'reasoning', delta: thought });
+        for (const tc of delta.tool_calls || []) if (tc.function?.name) onEvent({ type: 'tool_call', name: tc.function.name });
+        if (delta.content) { text += delta.content; onEvent({ type: 'content', delta: delta.content }); }
         if (ch.finish_reason === 'error' || ch.finish_reason === 'cancelled') throw new Error(`Hermes ended the turn: ${ch.finish_reason}`);
       }
     }
@@ -204,6 +254,14 @@ export class Comms {
     const log = this.log().filter((e) => e.id !== entry.id);
     log.push(entry);
     log.sort((a, b) => a.at - b.at);
+    // keep the whole trace on the newest few turns only; older ones keep a short list of steps
+    const keep = new Set(log.filter((e) => e.trace).slice(-TRACE_KEEP).map((e) => e.id));
+    for (let i = 0; i < log.length; i++) {
+      const tr = log[i].trace;
+      if (tr && !keep.has(log[i].id) && (tr.reasoning || tr.partial || tr.steps?.length > 12)) {
+        log[i] = { ...log[i], trace: { t0: tr.t0, ms: tr.ms, done: true, steps: (tr.steps || []).slice(-12) } };
+      }
+    }
     this.hooks.patch({ comms: { log: log.slice(-LOG_MAX) } });
     return entry;
   }
@@ -307,36 +365,50 @@ export class Comms {
   }
 
   async deliver(entry, rawCfg, baseUrl) {
+    const trace = new Trace((snap) => this.update(entry.id, { trace: snap, progress: trace.tool || null }));
+    try {
+      await this.deliverTraced(entry, rawCfg, baseUrl, trace);
+    } catch (e) {
+      trace.close('fail', e.message.slice(0, 120));
+      this.update(entry.id, { trace: trace.snapshot(true) });
+      throw e;
+    }
+  }
+
+  async deliverTraced(entry, rawCfg, baseUrl, trace) {
     const cfg = interpolate(rawCfg, this.env);
+    trace.step('rx', entry.audio ? (entry.kind === 'note' ? 'VOICE NOTE RECEIVED' : 'VOICE PACKET RECEIVED') : 'TEXT PACKET RECEIVED');
     if (entry.audio && !entry.text && this.env.STT_URL) {
       this.update(entry.id, { status: 'transcribing' });
+      trace.step('stt', 'TRANSCRIBING VOICE');
       const text = await this.transcribe(entry.audio).catch((e) => { console.warn(`[comms] stt: ${e.message}`); return ''; });
-      if (text) { entry.text = text; this.update(entry.id, { text }); }
+      if (text) { entry.text = text; this.update(entry.id, { text }); trace.step('stt', 'TRANSCRIPT LOCKED'); } else trace.step('stt', 'NO TRANSCRIPT');
     }
     const pub = (this.env.PUBLIC_URL || baseUrl || '').replace(/\/$/, '');
     if (entry.audio) entry.audio_url = `${pub}/api/comms/audio/${entry.audio}`;
-    if (!cfg.type) { this.update(entry.id, { status: 'queued' }); return; } // nowhere to send it; agents can read GET /api/comms/log
+    if (!cfg.type) { trace.close('queue', 'NO UPLINK · QUEUED'); this.update(entry.id, { status: 'queued', trace: trace.snapshot(true) }); return; } // agents can read GET /api/comms/log
 
     const replyCmd = `room reply ${entry.to} "your reply"`;
     const hint = cfg.reply_hint ?? `(Sent from the wall HUD. To answer out loud there, run: ${replyCmd})`;
     const timeout = Number(cfg.timeout_s || 300) * 1000;
     this.update(entry.id, { status: 'thinking' });
+    trace.step('link', `UPLINK → ${cfg.type === 'hermes' ? 'HERMES AGENT' : String(cfg.type).toUpperCase()}`);
 
     let reply = '';
     if (cfg.type === 'hermes') {
       const messages = [];
       if (cfg.system) messages.push({ role: 'system', content: cfg.system });
       messages.push({ role: 'user', content: compose(entry) });
-      let lastProgress = 0;
       reply = await hermesChat(`${hermesBase(cfg)}/v1/chat/completions`, {
         key: cfg.key, model: cfg.model, messages,
         session: cfg.session || `${entry.to}-hud`, sessionKey: cfg.session_key || cfg.session || `${entry.to}-hud`,
       }, {
         idleMs: timeout,
-        onProgress: (label) => {
-          if (!label || Date.now() - lastProgress < 700) return;
-          lastProgress = Date.now();
-          this.update(entry.id, { status: 'thinking', progress: label });
+        onEvent: (ev) => {
+          if (ev.type === 'tool' && ev.label) trace.step('tool', ev.label);
+          else if (ev.type === 'tool_call') trace.step('tool', ev.name);
+          else if (ev.type === 'reasoning') trace.think(ev.delta);
+          else if (ev.type === 'content') trace.write(ev.delta);
         },
       });
     } else if (cfg.type === 'openai') {
@@ -369,7 +441,8 @@ export class Comms {
     } else {
       throw new Error(`unknown type "${cfg.type}"`);
     }
-    this.update(entry.id, { status: 'delivered', progress: null });
+    trace.close('done', 'RESPONSE RECEIVED');
+    this.update(entry.id, { status: 'delivered', progress: null, trace: trace.snapshot(true) });
     reply = String(reply || '').trim();
     if (reply) await this.reply({ from: entry.to, text: reply, replyTo: entry.id });
   }

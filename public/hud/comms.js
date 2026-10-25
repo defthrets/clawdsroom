@@ -15,6 +15,8 @@ const hms = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d
 const mmss = (s) => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
 const STATUS = { sending: 'TRANSMITTING', transcribing: 'TRANSCRIBING', thinking: 'PROCESSING', delivered: 'DELIVERED', queued: 'QUEUED · NO LINK', failed: 'FAILED', received: '' };
 const PENDING = new Set(['sending', 'transcribing', 'thinking']);
+const STEP_ICON = { rx: '◈', stt: '≋', link: '⟁', tool: '⚙', reason: '◌', compose: '✎', done: '✓', fail: '✕', queue: '⧗' };
+const secs = (ms) => `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 
 export function initComms(store, { $, params }) {
   // ------------------------------------------------------------ token (only needed if the server has one)
@@ -28,6 +30,8 @@ export function initComms(store, { $, params }) {
     state: $('cm-state'), caption: $('cm-caption'), cancel: $('cm-cancel'), hint: $('cm-hint'), input: $('cm-input'),
     sendBtn: $('cm-send'), speak: $('cm-speak'), badge: $('comms-badge'), count: $('cm-count'),
     sig: $('cm-sig'), amp: $('cm-amp'), chan: $('cm-chan'), clock: $('cm-clock'),
+    cog: $('cg'), cgLive: $('cg-live'), cgSteps: $('cg-steps'), cgTime: $('cg-time'), cgTools: $('cg-tools'),
+    cgList: $('cg-list'), cgThought: $('cg-thought'), cgChars: $('cg-chars'),
   };
   const core = new Core(ui.core);
   let agents = [{ id: 'clawd', label: 'Clawd', ready: false }];
@@ -143,7 +147,7 @@ export function initComms(store, { $, params }) {
   function render(force = false) {
     const items = log().filter((e) => e.to === current || e.from === current).slice(-30);
     ui.count.textContent = `${items.length} TX`;
-    const key = JSON.stringify(items.map((e) => [e.id, e.status, e.text, e.audio, e.progress]));
+    const key = JSON.stringify([[...openTraces], ...items.map((e) => [e.id, e.status, e.text, e.audio, e.progress, e.trace?.done])]);
     if (!force && key === threadKey) return;
     threadKey = key;
     if (!items.length) {
@@ -162,11 +166,22 @@ export function initComms(store, { $, params }) {
         <div class="msg-body">${src ? `<button class="play" data-src="${esc(src)}" aria-label="play">▶</button>` : ''}<span${fresh ? ` data-decrypt="${esc(e.id)}"` : ''}>${esc(e.text || (src ? '(voice, no transcript)' : ''))}</span></div>
         ${e.error ? `<div class="msg-err">${esc(e.error)}</div>` : ''}
         ${PENDING.has(e.status) && mine ? `<div class="dots"><i></i><i></i><i></i>${e.progress ? `<span class="prog">⚙ ${esc(e.progress)}</span>` : ''}</div>` : ''}
+        ${mine && e.trace?.done && e.trace.steps?.length ? traceDrawer(e) : ''}
       </div>`;
     }).join('');
     for (const el of ui.thread.querySelectorAll('[data-decrypt]')) decrypt(el);
     ui.thread.scrollTop = ui.thread.scrollHeight;
   }
+  // A finished turn's steps, folded away under the message.
+  const openTraces = new Set();
+  function traceDrawer(e) {
+    const tr = e.trace, n = tr.steps.length, tools = tr.steps.filter((s) => s.kind === 'tool').length;
+    const head = `<button class="tr-btn" data-trace="${esc(e.id)}">${openTraces.has(e.id) ? '▾' : '▸'} TRACE · ${n} STEPS${tools ? ` · ${tools} TOOL${tools > 1 ? 'S' : ''}` : ''} · ${secs(tr.ms)}</button>`;
+    if (!openTraces.has(e.id)) return head;
+    const list = tr.steps.map((s) => `<li class="${esc(s.kind)}"><b>${STEP_ICON[s.kind] || '·'} ${esc(s.text)}</b><span>${secs(s.at)}</span></li>`).join('');
+    return `${head}<ul class="tr-list">${list}</ul>${tr.reasoning ? `<div class="tr-thought">${esc(tr.reasoning)}</div>` : ''}`;
+  }
+
   // New replies arrive scrambled and resolve left to right.
   function decrypt(el) {
     const id = el.dataset.decrypt;
@@ -184,6 +199,8 @@ export function initComms(store, { $, params }) {
     requestAnimationFrame(step);
   }
   ui.thread.addEventListener('click', (ev) => {
+    const t = ev.target.closest('.tr-btn');
+    if (t) { const id = t.dataset.trace; openTraces.has(id) ? openTraces.delete(id) : openTraces.add(id); render(true); return; }
     const b = ev.target.closest('.play');
     if (!b) return;
     unlockAudio();
@@ -247,21 +264,40 @@ export function initComms(store, { $, params }) {
     hintTimer = setTimeout(() => { ui.hint.classList.remove('bad'); ui.hint.textContent = baseHint(); }, 4000);
   }
 
-  // Demo mode has no server: fake the round trip so the link can be tried.
+  // Demo mode has no server: fake a traced round trip so the link can be tried.
   function demoExchange({ text }) {
     const id = `d${Date.now().toString(36)}`;
-    const entry = { id, at: Date.now(), from: 'you', to: current, kind: mode, text, status: 'sending' };
+    const t0 = Date.now(), who = current, note = mode === 'note';
+    const steps = [];
+    let entry = { id, at: t0, from: 'you', to: current, kind: mode, text, status: 'sending' };
     const put = (e) => store.patch({ comms: { log: [...log().filter((x) => x.id !== e.id), e].slice(-60) } });
-    const who = current, note = mode === 'note';
-    put(entry);
-    setTimeout(() => put({ ...entry, status: 'thinking', progress: 'terminal: checking the dish' }), 700);
+    const trace = (extra = {}) => ({ t0, ms: Date.now() - t0, done: false, steps: steps.map((s) => ({ ...s })), reasoning: '', partial: '', ...extra });
+    const step = (kind, label) => { const at = Date.now() - t0; if (steps.length) steps[steps.length - 1].end = at; steps.push({ kind, text: label, at }); };
+    const thought = 'They want a status check. The dish is the thing most likely to wobble, so look at Starlink first: ping, drops, obstruction. Then the homelab load. Keep the answer short; it will be read out loud.';
+    const answer = note ? 'Got your voice note. I will pick it up shortly.' : 'All good. Starlink is holding at thirty one milliseconds with no drops, and the homelab is idling at twelve percent.';
+    const timeline = [
+      [0, () => step('rx', note ? 'VOICE NOTE RECEIVED' : 'TEXT PACKET RECEIVED')],
+      [350, () => { entry.status = 'thinking'; step('link', 'UPLINK → HERMES AGENT'); }],
+      [900, () => step('reason', 'REASONING')],
+      [2400, () => { step('tool', 'terminal: grpcurl dish get_status'); entry.progress = 'terminal: grpcurl dish get_status'; }],
+      [3900, () => { step('tool', 'web_search: starlink outage map'); entry.progress = 'web_search: starlink outage map'; }],
+      [5200, () => step('reason', 'REASONING')],
+      [6000, () => step('compose', 'COMPOSING RESPONSE')],
+    ];
+    let reasoning = '', partial = '';
+    for (const [at, fn] of timeline) setTimeout(() => { fn(); put({ ...entry, trace: trace({ reasoning, partial }) }); }, at);
+    // reasoning streams in two bursts, the answer streams last
+    const stream = (from, to, src, set) => { const n = src.length; for (let k = 1; k <= 20; k++) setTimeout(() => { set(src.slice(0, Math.round((n * k) / 20))); put({ ...entry, trace: trace({ reasoning, partial }) }); }, from + ((to - from) * k) / 20); };
+    stream(950, 2350, thought.slice(0, 92), (v) => { reasoning = v; });
+    stream(5250, 5950, thought, (v) => { reasoning = v; });
+    stream(6050, 7400, answer, (v) => { partial = v; });
     setTimeout(() => {
-      put({ ...entry, status: 'delivered' });
-      const lines = note
-        ? ['Got your voice note. I will pick it up shortly.', 'Noted. I will get on it.']
-        : ['Copy that. Everything looks quiet on the homelab.', 'On it. Starlink is holding steady at thirty one milliseconds.', 'Roger. I will keep an eye on it.'];
-      put({ id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: lines[Math.floor(Math.random() * lines.length)], status: 'received', reply_to: id });
-    }, 3200);
+      step('done', 'RESPONSE RECEIVED');
+      steps[steps.length - 1].end = steps[steps.length - 1].at;
+      entry = { ...entry, status: 'delivered', progress: null, trace: { ...trace({ reasoning }), done: true } };
+      put(entry);
+      put({ id: `${id}r`, at: Date.now(), from: who, to: 'you', kind: 'reply', text: answer, status: 'received', reply_to: id });
+    }, 7600);
   }
 
   // ------------------------------------------------------------ recording
@@ -425,13 +461,13 @@ export function initComms(store, { $, params }) {
     if (rec) return mode === 'note' ? 'note' : 'listening';
     if (speakingAgent) return 'speaking';
     const p = pendingFor(current);
-    if (p) return p.status === 'thinking' ? 'thinking' : 'sending';
+    if (p) return p.trace?.partial ? 'composing' : p.status === 'thinking' ? 'thinking' : 'sending';
     if (performance.now() - sendFlashAt < 1500) return 'sending';
     if (a.ready && a.online === false) return 'offline';
     return 'idle';
   }
 
-  const LABEL = { idle: 'STANDBY', listening: 'LISTENING', note: 'RECORDING', sending: 'TRANSMITTING', thinking: 'PROCESSING', speaking: 'RESPONDING', offline: 'LINK DOWN' };
+  const LABEL = { idle: 'STANDBY', listening: 'LISTENING', note: 'RECORDING', sending: 'TRANSMITTING', thinking: 'PROCESSING', composing: 'COMPOSING', speaking: 'RESPONDING', offline: 'LINK DOWN' };
   let lastFrame = 0, lastText = '';
   function loop(now) {
     if (!isOpen()) return;
@@ -455,14 +491,17 @@ export function initComms(store, { $, params }) {
     if (html !== lastText) { ui.state.innerHTML = html; lastText = html; }
 
     // caption: your words while you talk, his words (lit as spoken) while he answers
-    let cap = '', you = false;
+    let cap = '', you = false, forming = false;
     if (rec) { cap = `${esc(`${rec.transcript} ${rec.interim}`.trim())}<span class="cur"></span>`; you = true; }
+    else if (st === 'composing' && p?.trace?.partial) { const t = p.trace.partial; cap = `${esc(t.length > 220 ? `…${t.slice(-220)}` : t)}<span class="cur"></span>`; forming = true; }
     else if (lastReply && (speakingAgent || now - speakStart < 20000)) {
       const t = lastReply.text, n = Math.min(t.length, lastReply.lit);
       cap = `<span class="lit">${esc(t.slice(0, n))}</span>${esc(t.slice(n))}`;
     } else if (st === 'idle') cap = '';
     if (ui.caption.innerHTML !== cap) ui.caption.innerHTML = cap;
     ui.caption.classList.toggle('you', you);
+    ui.caption.classList.toggle('forming', forming);
+    renderCog(now, p);
 
     // readouts
     const a = agentOf(current);
@@ -472,6 +511,66 @@ export function initComms(store, { $, params }) {
     const since = rec ? (now - rec.started) / 1000 : speakingAgent ? (now - speakStart) / 1000 : (now - openedAt) / 1000;
     ui.clock.textContent = mmss(since);
     if (rec && (now - rec.started) / 1000 >= MAX_REC_S) stopRec(true);
+  }
+
+  // ------------------------------------------------------------ cognition: the steps and the thought stream
+  let cogKey = '', cogFor = null, thoughtShown = 0, thoughtHtml = '', toolsSeen = new Map();
+  function activeTrace(p) {
+    if (p?.trace) return { e: p, live: true };
+    const last = log().filter((e) => e.from === 'you' && e.to === current && e.trace).pop();
+    return last ? { e: last, live: false } : null;
+  }
+  function renderCog(now, p) {
+    const at = activeTrace(p);
+    ui.cog.classList.toggle('active', !!at?.live);
+    if (!at) {
+      if (cogKey !== 'none') {
+        cogKey = 'none';
+        ui.cgLive.textContent = 'IDLE'; ui.cgSteps.textContent = '0'; ui.cgTime.textContent = '0.0s'; ui.cgTools.textContent = '0'; ui.cgChars.textContent = '';
+        ui.cgList.innerHTML = '<li class="cog-empty">AWAITING TRANSMISSION</li>';
+        ui.cgThought.innerHTML = '<span class="none">NO ACTIVE THOUGHT PROCESS</span>';
+      }
+      return;
+    }
+    const { e, live } = at, tr = e.trace, steps = tr.steps || [];
+    // tools launch out of the core as they start
+    const tools = steps.filter((s) => s.kind === 'tool');
+    const seenN = toolsSeen.get(e.id) ?? (live ? 0 : tools.length);
+    for (const s of tools.slice(seenN)) core.addNode(s.text);
+    toolsSeen.set(e.id, tools.length);
+    if (toolsSeen.size > 20) toolsSeen.delete(toolsSeen.keys().next().value);
+
+    const elapsed = live ? Date.now() - tr.t0 : tr.ms;
+    ui.cgLive.textContent = live ? (tr.partial ? '● COMPOSING' : '● LIVE') : 'LAST TRACE';
+    ui.cgSteps.textContent = String(steps.length);
+    ui.cgTools.textContent = String(tools.length);
+    ui.cgTime.textContent = secs(elapsed);
+    const key = `${e.id}|${steps.length}|${live}`;
+    if (key !== cogKey) {
+      cogKey = key;
+      ui.cgList.innerHTML = steps.slice(-9).map((s, i, arr) => {
+        const isLive = live && i === arr.length - 1;
+        return `<li class="step ${esc(s.kind)}${isLive ? ' live' : ''}"><span class="ic"><span>${STEP_ICON[s.kind] || '·'}</span></span><span class="tx">${esc(s.text)}</span><span class="du">${isLive ? '' : secs((s.end ?? s.at) - s.at)}</span></li>`;
+      }).join('');
+    }
+    if (live && steps.length) {
+      const du = ui.cgList.querySelector('.step.live .du');
+      if (du) du.textContent = secs(Date.now() - tr.t0 - steps[steps.length - 1].at);
+    }
+    // the thought stream types itself out
+    const text = tr.reasoning || '';
+    if (cogFor !== e.id) { cogFor = e.id; thoughtShown = live ? 0 : text.length; }
+    if (thoughtShown > text.length) thoughtShown = text.length;
+    thoughtShown = Math.min(text.length, thoughtShown + Math.max(1, Math.ceil((text.length - thoughtShown) * 0.12)));
+    ui.cgChars.textContent = text ? `${text.length} CH` : '';
+    let html;
+    if (!text) html = `<span class="none">${live ? 'NO REASONING STREAMED YET' : 'NO REASONING EXPOSED'}</span>`;
+    else {
+      const shown = text.slice(Math.max(0, thoughtShown - 700), thoughtShown);
+      const cut = Math.max(0, shown.length - 40);
+      html = `${esc(shown.slice(0, cut))}<span class="new">${esc(shown.slice(cut))}</span>${live ? '<span class="cur"></span>' : ''}`;
+    }
+    if (html !== thoughtHtml) { ui.cgThought.innerHTML = `<div>${html}</div>`; thoughtHtml = html; }
   }
 
   // ------------------------------------------------------------ boot
