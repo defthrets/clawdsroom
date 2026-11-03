@@ -2,7 +2,7 @@
 // (time of day, which rooms are lit, what Clawd is effectively doing).
 
 import { DEFAULT_STATE, ACTIVITIES } from './defaults.js';
-import { applyEvent, clone, deepMerge, expandDots } from './reducer.js';
+import { applyEvent, clone, deepMerge, expandDots, historySample } from './reducer.js';
 import { parseHHMM, clamp } from './util.js';
 
 export class Store {
@@ -12,7 +12,7 @@ export class Store {
     this.mode = 'connecting'; // connecting | live | demo | lost
     this.lastSeen = 0;
     this.hourOverride = null; // ?hour=23 for testing the day/night cycle
-    this.history = [];        // [{t, cpu, ram, temp, battery, solar_w, load_w, disk_root, disk_mnt}] for the trend charts
+    this.history = [];        // [historySample(...)] for the trend charts
     this.historyMax = 720;
     this.historyInterval = 30000;
     this.activityLog = [];    // [{activity, at}] what Clawd has been up to (client-side)
@@ -73,8 +73,7 @@ export class Store {
     const now = Date.now();
     const last = this.history[this.history.length - 1];
     if (!force && last && now - last.t < this.historyInterval) return;
-    const sys = this.state.system || {}, pw = this.state.power || {};
-    this.history.push({ t: now, cpu: sys.cpu ?? null, ram: sys.ram ?? null, temp: sys.temp ?? null, disk_root: sys.disk_root ?? null, disk_mnt: sys.disk_mnt ?? null, battery: pw.battery ?? null, solar_w: pw.solar_w ?? null, load_w: pw.load_w ?? null });
+    this.history.push(historySample(this.state, now));
     if (this.history.length > this.historyMax) this.history.splice(0, this.history.length - this.historyMax);
   }
 

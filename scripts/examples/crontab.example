@@ -5,3 +5,4 @@ ROOM_URL=http://localhost:8787
 40 7 * * *    /opt/clawdsroom/scripts/room event cron "name=morning brief"
 30 22 * * *   /opt/clawdsroom/scripts/room event cron "name=nightly diary"
 */5 * * * *   /opt/clawdsroom/scripts/room event cron "name=watchdog"
+@reboot       ROOM_URL=http://localhost:8787 /opt/clawdsroom/scripts/examples/starlink.sh --loop 5 >/dev/null 2>&1

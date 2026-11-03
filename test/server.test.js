@@ -38,6 +38,9 @@ test('serves the room and the api', async () => {
   assert.equal(state.meta.host, '192.168.1.253');
   const missing = await fetch(`${BASE}/nope.js`);
   assert.equal(missing.status, 404);
+  const hud = await (await fetch(`${BASE}/hud/`)).text();
+  assert.match(hud, /CLAWD/);
+  assert.match(hud, /\/hud\/hud\.js/);
   const traversal = await fetch(`${BASE}/..%2Fpackage.json`);
   assert.notEqual(traversal.status, 200);
 });

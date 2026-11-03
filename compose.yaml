@@ -5,11 +5,22 @@ services:
     restart: unless-stopped
     ports:
       - "8787:8787"
+      - "8788:8788"
+    # The HUD's connections panel reads /proc/net, which is per network namespace. To see the
+    # homelab's real connections, use the host network instead of the port mapping above:
+    # network_mode: host
     environment:
       - COLLECT_SYSTEM=1
       - DISK_ROOT=/host/root
       - DISK_MNT=/host/mnt
       # - CLAWDSROOM_TOKEN=change-me
+      # The HUD's comms: HTTPS for the mic, and where to send speech-to-text (see README)
+      # - TLS_CERT=/data/tls/cert.pem
+      # - TLS_KEY=/data/tls/key.pem
+      # - STT_URL=http://speaches:8000/v1/audio/transcriptions
+      # - HERMES_API_SERVER_KEY=...   (Hermes Agent's API_SERVER_KEY; with the port mapping above,
+      #   use "url": "http://host.docker.internal:8642" in data/agents.json and add
+      #   extra_hosts: ["host.docker.internal:host-gateway"], or use network_mode: host)
     volumes:
       - ./data:/data
       - /:/host/root:ro

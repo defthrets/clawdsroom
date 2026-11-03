@@ -5,6 +5,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import { execFile } from 'node:child_process';
+import { collectNetwork } from './network.js';
 
 let prevCpu = null;
 
@@ -98,8 +99,9 @@ function diskUsedGb(path) {
 }
 
 export async function collectSystem({ diskRoot = '/', diskMnt = '/mnt' } = {}) {
-  const [cpu, ram, temp, dRoot, dMnt, mnt] = await Promise.all([
+  const [cpu, ram, temp, dRoot, dMnt, mnt, network] = await Promise.all([
     cpuPercent(), ramPercent(), cpuTemp(), diskPercent(diskRoot), diskPercent(diskMnt), diskUsedGb(diskMnt),
+    collectNetwork().catch(() => ({})),
   ]);
   const system = {};
   if (cpu != null) system.cpu = cpu;
@@ -111,5 +113,6 @@ export async function collectSystem({ diskRoot = '/', diskMnt = '/mnt' } = {}) {
   system.load = os.loadavg().map((n) => n.toFixed(2)).join(' ');
   const patch = { system };
   if (mnt && mnt.total > 0) patch.storage = { mnt_used_gb: mnt.used, mnt_total_gb: mnt.total };
+  if (Object.keys(network).length) patch.network = network;
   return patch;
 }
