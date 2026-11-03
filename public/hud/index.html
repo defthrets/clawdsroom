@@ -139,9 +139,9 @@
 
     <footer class="bottom">
       <div class="tiles" id="tiles"></div>
-      <div class="panel log">
-        <h2><i></i>EVENT <b>// LOG</b></h2>
-        <div class="log-lines" id="log"></div>
+      <div class="panel camsq" id="camsq">
+        <h2><i></i>CAMS <b>// RECENT</b><em id="cq-meta">—</em></h2>
+        <div class="cq-strip" id="cq-strip"></div>
       </div>
     </footer>
 
@@ -247,6 +247,30 @@
         </div>
       </div>
     </section>
+
+    <!-- a camera detection, full screen -->
+    <div class="cqv hidden" id="cqv" role="dialog" aria-label="Camera event">
+      <div class="cqv-box">
+        <div class="cqv-top"><span class="cqv-glyph">◉</span><span class="cqv-title" id="cqv-title"></span><span class="cqv-mode" id="cqv-mode"></span><button class="cqv-x" id="cqv-close" aria-label="close">✕</button></div>
+        <div class="cqv-main">
+          <div class="cqv-frame">
+            <img id="cqv-img" alt="">
+            <video id="cqv-vid" playsinline controls muted></video>
+            <i class="cqv-c tl"></i><i class="cqv-c tr"></i><i class="cqv-c bl"></i><i class="cqv-c br"></i>
+            <div class="cqv-scan"></div>
+          </div>
+          <div class="cqv-side">
+            <div class="cqv-meta" id="cqv-meta"></div>
+            <div class="cqv-btns">
+              <button id="cqv-clip">▶ CLIP</button>
+              <button id="cqv-live">● LIVE</button>
+              <div class="cqv-nav"><button id="cqv-prev" aria-label="newer">◀</button><button id="cqv-next" aria-label="older">▶</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="cqv-film" id="cqv-film"></div>
+      </div>
+    </div>
 
     <!-- Hermes is waiting on you: approve a command, or answer a question -->
     <div class="auth hidden" id="auth" role="alertdialog" aria-label="Authorization required">

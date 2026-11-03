@@ -17,6 +17,7 @@
 //   POST /api/comms/reply   {from, text, audio_url?} (or audio body + ?from=&text=): an agent answers
 //   GET  /api/comms/audio/<file>
 //   POST /api/comms/stop {id}  ·  POST /api/comms/control {id, choice | answer}: stop a turn, answer an approval/question
+//   GET  /api/cams/recent  ·  /api/cams/thumb|snapshot|clip/<event id>  ·  /api/cams/latest/<camera>: Frigate (FRIGATE_URL)
 //   GET  /api/hermes/overview?agent=clawd  ·  POST /api/hermes/jobs/<id>/run|pause|resume: Hermes Agent's system
 //
 // Env: PORT (8787), HOST (0.0.0.0), CLAWDSROOM_TOKEN (optional bearer token for writes),
@@ -34,6 +35,7 @@ import { DEFAULT_STATE } from '../public/js/defaults.js';
 import { applyEvent, clone, coerce, deepMerge, expandDots, historySample, isObj } from '../public/js/reducer.js';
 import { collectSystem } from './system.js';
 import { Comms } from './comms.js';
+import { Frigate } from './frigate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -67,6 +69,8 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
 };
+
+const frigate = new Frigate();
 
 const comms = new Comms({
   dataDir: DATA_DIR,
@@ -288,6 +292,9 @@ async function handle(req, res) {
       return send(res, 200, comms.log().filter((e) => (!who || e.from === who || e.to === who) && e.at > since));
     }
     if (p.startsWith('/api/comms/audio/') && (req.method === 'GET' || req.method === 'HEAD')) return comms.serveAudio(req, res, p.slice('/api/comms/audio/'.length));
+    if (p === '/api/cams/recent' && req.method === 'GET') return send(res, 200, await frigate.recent(Number(url.searchParams.get('limit') || 24)));
+    const cam = p.match(/^\/api\/cams\/(thumb|snapshot|clip|latest)\/([^/]+)$/);
+    if (cam && (req.method === 'GET' || req.method === 'HEAD')) return frigate.pipe(req, res, cam[1], decodeURIComponent(cam[2]), url.searchParams.get('h'));
     if (p === '/api/hermes/overview' && req.method === 'GET') {
       return send(res, 200, await comms.overview(url.searchParams.get('agent') || 'clawd', { fresh: url.searchParams.has('fresh') }));
     }

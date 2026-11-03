@@ -140,6 +140,17 @@ sudo systemctl daemon-reload && sudo systemctl enable --now clawdsroom-starlink
 
 Check: `curl -s localhost:8787/api/state | jq .starlink` shows `online: true` and a recent `updated`.
 
+## 6b. Frigate on the HUD
+
+The HUD's bottom-right square shows Frigate's recent detections. Point the room at Frigate's internal API (the
+unauthenticated port, usually 5000) and restart:
+
+```bash
+echo 'FRIGATE_URL=http://127.0.0.1:5000' >> /opt/clawdsroom/data/room.env
+sudo systemctl restart clawdsroom
+curl -s localhost:8787/api/cams/recent | head -c 300     # "enabled":true and recent events
+```
+
 ## 7. Keep the room alive (your hooks)
 
 The room shows what you are doing. Use `scripts/room` (add it to your PATH, e.g.

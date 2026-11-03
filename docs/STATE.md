@@ -17,6 +17,7 @@ Everything the room shows comes from one JSON document, the **state**, plus a st
 * `POST /api/comms/voice?to=&kind=&text=` → a voice message: the recording as the body (`audio/*`)
 * `POST /api/comms/reply` → `{from, text, audio_url?}` (or an `audio/*` body with `?from=&text=`): an agent answers, spoken on the HUD
 * `GET  /api/comms/audio/<file>` → a stored recording (byte ranges supported)
+* `GET  /api/cams/recent` → Frigate's latest detections (`FRIGATE_URL`); `/api/cams/thumb|snapshot|clip/<event id>` and `/api/cams/latest/<camera>` proxy the media (byte ranges for clips)
 * `POST /api/comms/stop` → `{id}`: stop a running turn (and its Hermes run)
 * `POST /api/comms/control` → `{id, choice}` for an approval (`once`, `deny`, ...) or `{id, answer}` for a clarifying question
 * `GET  /api/hermes/overview?agent=clawd` → Hermes Agent's health, capabilities, skills, toolsets, jobs, sessions and models (cached 15s; `&fresh=1`)

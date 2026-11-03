@@ -102,7 +102,12 @@ cameras, just the numbers, laid out for an iPad mini in landscape.
   Inbound/outbound/listening counts, RX/TX on the WAN interface, the busiest peers (reverse DNS
   where there is one) with their service, and the ports the box listens on.
 * Along the bottom: cams, Chirpa, crew bus, Telegram, watchdog, ADS-B/433, Immich, memory, next
-  cron, LAN/WAN, and a live event log. Problems (watchdog alerts, Starlink offline or obstructed,
+  cron and LAN/WAN tiles, and in the bottom-right square **CAMS // RECENT**: Frigate's latest detections as a strip of
+  CCTV-style cards (thumbnail, camera and time stamp, colour-coded label, confidence bar; the newest glitches in and is
+  marked LATEST; swipe for older ones). Tap one for the full viewer: the snapshot with its bounding box, **▶ CLIP** to
+  play the recording, **● LIVE** for the camera right now, and a filmstrip of the rest. Set `FRIGATE_URL` to Frigate's
+  internal API (e.g. `http://127.0.0.1:5000`; `FRIGATE_TOKEN` if it needs a bearer token); the server proxies it, so the
+  iPad never talks to Frigate directly. Without it the square shows the room's own `cam` events with stand-in frames. Problems (watchdog alerts, Starlink offline or obstructed,
   low battery, WAN down) show as alerts at the top.
 
 **ROOM** in the HUD's top bar takes you to Clawd's Room, and **HUD ▸** in the room's top bar brings you back.
@@ -322,6 +327,7 @@ Environment variables for the server:
 | `COLLECT_SYSTEM` | `1` on Linux | Auto-fill `system.*` every `SYSTEM_INTERVAL_MS` (10000). |
 | `DISK_ROOT`, `DISK_MNT` | `/`, `/mnt` | Paths reported as `disk_root` / `disk_mnt`. |
 | `NET_IFACE` | default route | Interface the HUD reports RX/TX for. |
+| `FRIGATE_URL`, `FRIGATE_TOKEN` | unset | Frigate's API for the HUD's CAMS // RECENT square (thumbnails, snapshots, clips, live frames). |
 | `TLS_CERT`, `TLS_KEY`, `HTTPS_PORT` | unset, unset, `8788` | Also serve HTTPS (the HUD's mic needs it). |
 | `AGENTS_FILE` | `data/agents.json` | How to reach Clawd (Hermes Agent) and anything else on the comms (see above). |
 | `HERMES_API_SERVER_KEY` | unset | Hermes Agent's `API_SERVER_KEY`, read by the example `agents.json`. |

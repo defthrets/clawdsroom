@@ -536,6 +536,7 @@ function logLine(e) {
 }
 function addLog(e) {
   const box = $('log');
+  if (!box) return; // the bottom-right square shows camera detections now
   box.querySelector('.idle')?.remove();
   box.prepend(logLine(e));
   while (box.children.length > 7) box.lastChild.remove();
@@ -543,6 +544,7 @@ function addLog(e) {
 let logSeeded = false;
 function seedLog() {
   if (logSeeded) return;
+  if (!$('log')) { logSeeded = true; return; }
   const evs = (store.state.events || []).slice(-7);
   if (!evs.length) { $('log').innerHTML = '<div class="ll idle"><span class="lt">--:--:--</span><span class="lk">IDLE</span><span class="lx">no events yet</span></div>'; return; }
   logSeeded = true;
@@ -705,6 +707,10 @@ connect(store, {
     dirty = true;
   },
 });
+
+// CAMS // RECENT (the bottom-right square) loads on its own too.
+import('/hud/cams.js').then(({ initCams }) => { window.hud.cams = initCams(store, { $ }); })
+  .catch((e) => { console.error(e); if (window.hudError) window.hudError(`CAMS did not load: ${e && e.message ? e.message : e}`); });
 
 // COMMS and HERMES load on their own: if either fails on this device, the rest of the HUD still runs.
 let comms = null, systems = null;
